@@ -483,7 +483,6 @@ const App: React.FC = () => {
                 {generatedImageUrl && (
                   <Button 
                     variant="outline" 
-                    size="sm"
                     className="!py-1.5 !px-3 text-xs"
                     onClick={() => downloadImage(generatedImageUrl!, 'n-era-result.png')}
                     icon={<Download size={14} />}

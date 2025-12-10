@@ -2,10 +2,39 @@ import { GoogleGenAI, Part } from "@google/genai";
 import { AspectRatio, LightingStyle, CameraPerspective, ColorTheory, ReferenceTactic, ImageFile } from "../types";
 import { resizeImageToAspectRatio } from "../utils";
 
+// Helper to reliably find the API Key in various environments (Vite, CRA, Next.js, Node)
+const getApiKey = (): string | undefined => {
+  // 1. Try standard process.env (Webpack, Create React App, Next.js, Node)
+  if (typeof process !== 'undefined' && process.env) {
+    if (process.env.API_KEY) return process.env.API_KEY;
+    if (process.env.REACT_APP_API_KEY) return process.env.REACT_APP_API_KEY;
+    if (process.env.NEXT_PUBLIC_API_KEY) return process.env.NEXT_PUBLIC_API_KEY;
+  }
+  
+  // 2. Try import.meta.env (Vite)
+  try {
+    // @ts-ignore - Prevent TS errors if types aren't configured for Vite
+    if (import.meta && import.meta.env) {
+        // @ts-ignore
+        if (import.meta.env.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
+        // @ts-ignore
+        if (import.meta.env.API_KEY) return import.meta.env.API_KEY;
+    }
+  } catch (e) {
+    // Ignore reference errors
+  }
+
+  return undefined;
+};
+
 // Initialize the API client
-// Note: We create a new instance in the functions to ensure we pick up the latest env var if it changes,
-// though typically process.env.API_KEY is static.
-const getAIClient = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
+const getAIClient = () => {
+    const key = getApiKey();
+    if (!key) {
+        console.warn("Gemini API Key missing. Please set API_KEY, VITE_API_KEY, REACT_APP_API_KEY, or NEXT_PUBLIC_API_KEY in your environment variables.");
+    }
+    return new GoogleGenAI({ apiKey: key || '' });
+};
 
 const NANO_BANANA_MODEL = 'gemini-2.5-flash-image';
 const PROMPT_MODEL = 'gemini-2.5-flash';

@@ -43,9 +43,10 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
               {history.length > 0 && (
                 <button 
                   onClick={onClear}
-                  className="text-xs text-slate-500 hover:text-red-500 font-medium px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                  title="Clear All History"
                 >
-                  Clear All
+                  <Trash2 size={20} />
                 </button>
               )}
               <button 
