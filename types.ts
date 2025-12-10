@@ -58,3 +58,17 @@ export interface ImageFile {
   base64: string;
   mimeType: string;
 }
+
+export interface HistoryItem {
+  id: string;
+  timestamp: number;
+  imageUrl: string;
+  prompt: string;
+  aspectRatio: AspectRatio;
+}
+
+export interface PromptTemplate {
+  id: string;
+  name: string;
+  content: string;
+}

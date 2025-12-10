@@ -98,11 +98,11 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
 
   return (
     <div className="w-full">
-      <div className="flex justify-between mb-2">
-        <label className="block text-sm font-medium text-slate-300">
-          {label} {optional && <span className="text-slate-500 text-xs">(Optional)</span>}
+      <div className="flex justify-between mb-2 ml-1">
+        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          {label} {optional && <span className="text-slate-400 dark:text-slate-600 font-normal normal-case ml-1">(Optional)</span>}
         </label>
-        <span className="text-xs text-slate-500">{images.length}/{maxFiles}</span>
+        <span className="text-xs font-medium text-slate-400 dark:text-slate-600">{images.length}/{maxFiles}</span>
       </div>
 
       <input
@@ -122,31 +122,32 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
           tabIndex={0}
           className={`
             relative group cursor-pointer 
-            border-2 border-dashed border-slate-700 hover:border-slate-500
-            rounded-xl bg-slate-900 hover:bg-slate-800/50
+            border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-brand-400 dark:hover:border-brand-400
+            rounded-2xl bg-slate-50 dark:bg-slate-900/50 hover:bg-white dark:hover:bg-slate-900
             transition-all duration-200 ease-in-out
-            h-32 flex flex-col items-center justify-center text-center p-4
-            outline-none focus:ring-2 focus:ring-yellow-400/50
+            h-36 flex flex-col items-center justify-center text-center p-4
+            outline-none focus:ring-2 focus:ring-brand-400/50 focus:border-brand-400
           `}
         >
-          <div className="bg-slate-800 p-2.5 rounded-full mb-2 group-hover:bg-slate-700 transition-colors">
-            <Upload size={20} className="text-yellow-400" />
+          <div className="bg-white dark:bg-slate-800 p-3 rounded-full mb-3 shadow-sm group-hover:scale-110 transition-transform duration-200">
+            <Upload size={20} className="text-brand-400" />
           </div>
-          <p className="text-sm font-medium text-slate-300">Click or Paste to upload</p>
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Click or Paste to upload</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Supports JPG, PNG, WEBP</p>
         </div>
       ) : (
         <div className="space-y-3">
           {/* Main Preview (Only for selectable types like Product Photo) */}
           {onSelect && images.length > 0 && images[selectedIndex] && (
-             <div className="relative h-48 rounded-xl overflow-hidden border border-slate-700 bg-slate-950 flex items-center justify-center group">
-                 <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMWgydjJIMUMxeiIgZmlsbD0iIzMzMyIgZmlsbC1vcGFjaXR5PSIwLjEiLz48L3N2Zz4=')] opacity-20"></div>
+             <div className="relative h-56 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 flex items-center justify-center group shadow-sm">
+                 <div className="absolute inset-0 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] opacity-30"></div>
                  <img 
                     src={images[selectedIndex].previewUrl} 
                     alt="Active Selection" 
-                    className="max-h-full max-w-full object-contain z-10"
+                    className="max-h-full max-w-full object-contain z-10 p-2"
                  />
-                 <div className="absolute top-2 left-2 z-20">
-                    <span className="px-2 py-0.5 rounded bg-yellow-400 text-slate-900 text-[10px] font-bold uppercase tracking-wider">
+                 <div className="absolute top-3 left-3 z-20">
+                    <span className="px-2.5 py-1 rounded-md bg-brand-400 text-slate-900 text-[10px] font-bold uppercase tracking-wider shadow-lg">
                         Active Shot
                     </span>
                  </div>
@@ -166,11 +167,11 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
                   key={idx}
                   onClick={() => onSelect && onSelect(idx)}
                   className={`
-                    relative aspect-square rounded-lg overflow-hidden cursor-pointer
+                    relative aspect-square rounded-xl overflow-hidden cursor-pointer
                     border-2 transition-all group
                     ${isActive 
-                        ? 'border-yellow-400 ring-1 ring-yellow-400/50' 
-                        : 'border-slate-700 hover:border-slate-500'}
+                        ? 'border-brand-400 ring-2 ring-brand-400/20' 
+                        : 'border-slate-200 dark:border-slate-700 hover:border-brand-400/50 dark:hover:border-brand-400/50'}
                   `}
                 >
                   <img 
@@ -182,7 +183,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
                   {/* Remove Button */}
                   <button
                     onClick={(e) => handleRemove(idx, e)}
-                    className="absolute top-0.5 right-0.5 p-0.5 bg-red-500/80 hover:bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute top-0.5 right-0.5 p-1 bg-red-500/90 hover:bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 scale-90 group-hover:scale-100"
                   >
                     <X size={10} />
                   </button>
@@ -194,7 +195,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
             {images.length < maxFiles && (
               <button
                 onClick={handleTriggerUpload}
-                className="aspect-square rounded-lg border-2 border-dashed border-slate-700 hover:border-yellow-500/50 hover:bg-slate-800 flex items-center justify-center transition-all text-slate-500 hover:text-yellow-400"
+                className="aspect-square rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-brand-400 dark:hover:border-brand-400 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center transition-all text-slate-400 dark:text-slate-500 hover:text-brand-400 dark:hover:text-brand-400"
                 title="Add another image"
               >
                 <Plus size={20} />
