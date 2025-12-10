@@ -2,13 +2,20 @@ import { GoogleGenAI, Part } from "@google/genai";
 import { AspectRatio, LightingStyle, CameraPerspective, ColorTheory, ReferenceTactic, ImageFile } from "../types";
 import { resizeImageToAspectRatio } from "../utils";
 
+// Prevent "Cannot find name 'process'" error in environments without @types/node
+declare const process: any;
+
 // Helper to reliably find the API Key in various environments (Vite, CRA, Next.js, Node)
 const getApiKey = (): string | undefined => {
   // 1. Try standard process.env (Webpack, Create React App, Next.js, Node)
-  if (typeof process !== 'undefined' && process.env) {
-    if (process.env.API_KEY) return process.env.API_KEY;
-    if (process.env.REACT_APP_API_KEY) return process.env.REACT_APP_API_KEY;
-    if (process.env.NEXT_PUBLIC_API_KEY) return process.env.NEXT_PUBLIC_API_KEY;
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      if (process.env.API_KEY) return process.env.API_KEY;
+      if (process.env.REACT_APP_API_KEY) return process.env.REACT_APP_API_KEY;
+      if (process.env.NEXT_PUBLIC_API_KEY) return process.env.NEXT_PUBLIC_API_KEY;
+    }
+  } catch (e) {
+    // Ignore access errors
   }
   
   // 2. Try import.meta.env (Vite)

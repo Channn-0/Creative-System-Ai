@@ -1,7 +1,6 @@
 import React from 'react';
 import { X, Calendar, Trash2, Image as ImageIcon } from 'lucide-react';
 import { HistoryItem } from '../types';
-import { Button } from './Button';
 
 interface HistorySidebarProps {
   isOpen: boolean;
