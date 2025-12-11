@@ -1,44 +1,48 @@
 import { GoogleGenAI, Part } from "@google/genai";
-import { AspectRatio, LightingStyle, CameraPerspective, ColorTheory, ReferenceTactic, ImageFile } from "../types";
+import { 
+  AppMode, 
+  AspectRatio, 
+  LightingStyle, 
+  CameraPerspective, 
+  ColorTheory, 
+  ReferenceTactic, 
+  ImageFile,
+  PortraitEnvironment,
+  PortraitVibe,
+  InteriorStyle,
+  InteriorMaterial
+} from "../types";
 import { resizeImageToAspectRatio } from "../utils";
 
 // Prevent "Cannot find name 'process'" error in environments without @types/node
 declare const process: any;
 
-// Helper to reliably find the API Key in various environments (Vite, CRA, Next.js, Node)
 const getApiKey = (): string | undefined => {
-  // 1. Try standard process.env (Webpack, Create React App, Next.js, Node)
   try {
     if (typeof process !== 'undefined' && process.env) {
       if (process.env.API_KEY) return process.env.API_KEY;
       if (process.env.REACT_APP_API_KEY) return process.env.REACT_APP_API_KEY;
       if (process.env.NEXT_PUBLIC_API_KEY) return process.env.NEXT_PUBLIC_API_KEY;
     }
-  } catch (e) {
-    // Ignore access errors
-  }
+  } catch (e) {}
   
-  // 2. Try import.meta.env (Vite)
   try {
-    // @ts-ignore - Prevent TS errors if types aren't configured for Vite
+    // @ts-ignore
     if (import.meta && import.meta.env) {
         // @ts-ignore
         if (import.meta.env.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
         // @ts-ignore
         if (import.meta.env.API_KEY) return import.meta.env.API_KEY;
     }
-  } catch (e) {
-    // Ignore reference errors
-  }
+  } catch (e) {}
 
   return undefined;
 };
 
-// Initialize the API client
 const getAIClient = () => {
     const key = getApiKey();
     if (!key) {
-        console.warn("Gemini API Key missing. Please set API_KEY, VITE_API_KEY, REACT_APP_API_KEY, or NEXT_PUBLIC_API_KEY in your environment variables.");
+        console.warn("Gemini API Key missing.");
     }
     return new GoogleGenAI({ apiKey: key || '' });
 };
@@ -47,123 +51,135 @@ const NANO_BANANA_MODEL = 'gemini-2.5-flash-image';
 const PROMPT_MODEL = 'gemini-2.5-flash';
 
 interface GeneratePromptParams {
-  productImage: ImageFile;
+  mode: AppMode;
+  inputImage: ImageFile;
   aspectRatio: AspectRatio;
-  lighting: LightingStyle;
-  perspective: CameraPerspective;
-  colorTheory: ColorTheory;
-  styleReferences: ImageFile[];
-  referenceTactic: ReferenceTactic;
+  
+  // Studio Params
+  lighting?: LightingStyle;
+  perspective?: CameraPerspective;
+  colorTheory?: ColorTheory;
+  styleReferences?: ImageFile[];
+  referenceTactic?: ReferenceTactic;
+
+  // Portrait Params
+  portraitEnv?: PortraitEnvironment;
+  portraitVibe?: PortraitVibe;
+
+  // Interior Params
+  interiorStyle?: InteriorStyle;
+  interiorMaterial?: InteriorMaterial;
 }
 
-/**
- * Generates a detailed text prompt using Gemini Flash (Text model).
- * It analyzes the style reference (if present) and combines it with user parameters.
- */
 export const generateOptimizedPrompt = async (params: GeneratePromptParams): Promise<string> => {
   const ai = getAIClient();
-  
-  let userInstruction = `You are an expert AI art director. 
-  Your task is to write a highly detailed, descriptive image generation prompt used to edit/restyle a product photo.
-  
-  The user wants the final image to have these attributes:
-  - Aspect Ratio target: ${params.aspectRatio}
-  - Lighting Style: ${params.lighting}
-  - Camera Perspective: ${params.perspective}
-  - Color Theory Strategy: ${params.colorTheory}
-  
-  Instructions:
-  1. ANALYZE the attached Product Image (the first image). Identify its primary and secondary colors.
-  2. Apply the selected Color Theory ("${params.colorTheory}") to choose background colors and environmental elements that harmonize with the product.
-     - If "Monochromatic": Use shades/tints of the product color.
-     - If "Complementary": Use colors opposite to the product on the color wheel.
-     - If "Analogous": Use colors adjacent to the product color.
-     - If "AI Auto-Select": Choose the most aesthetically pleasing color palette for this specific product type.
-  3. Describe the background, lighting, and mood in vivid detail matching the selected attributes and calculated color palette.
-  4. Ensure the product remains the central focus but sits naturally in this new environment.
-  5. Do NOT include phrases like "generated image", "aspect ratio" or "edit". Focus on visual descriptions of the scene.
-  6. CRITICAL: Include the instruction "Preserve the exact details, shape, text, and appearance of the primary product in the input image" at the start of the prompt.
-  7. Output ONLY the raw prompt text.`;
-
   const parts: Part[] = [];
 
-  // Add Product Image for analysis (Critical for Color Theory)
+  // Add Input Image for analysis
   parts.push({
     inlineData: {
-      mimeType: params.productImage.mimeType,
-      data: params.productImage.base64,
+      mimeType: params.inputImage.mimeType,
+      data: params.inputImage.base64,
     },
   });
 
-  if (params.styleReferences && params.styleReferences.length > 0 && params.referenceTactic !== ReferenceTactic.IGNORE) {
-    let tacticSpecifics = "";
+  let systemInstruction = "";
+
+  if (params.mode === AppMode.STUDIO) {
+    const isMatchLighting = params.lighting === LightingStyle.MATCH_REFERENCE;
+    const isMatchPerspective = params.perspective === CameraPerspective.MATCH_REFERENCE;
+
+    systemInstruction = `You are an expert commercial art director.
+    Task: Write a descriptive image generation prompt to restyle a product photo.
     
-    switch (params.referenceTactic) {
-        case ReferenceTactic.STYLE:
-            tacticSpecifics = "Focus exclusively on extracting the color palette, textures, and material artistic style (e.g. marble, wood, neon). Ignore the subject matter and layout of the references.";
-            break;
-        case ReferenceTactic.LIGHTING:
-            tacticSpecifics = "Focus exclusively on extracting the lighting setup, shadow qualities, direction of light, and atmospheric mood. Ignore the colors and composition.";
-            break;
-        case ReferenceTactic.COMPOSITION:
-            tacticSpecifics = "Focus exclusively on the camera angle, framing, depth of field, and geometric arrangement of elements. Ignore the specific colors and lighting.";
-            break;
-        case ReferenceTactic.FULL:
-        default:
-            tacticSpecifics = "Analyze and describe the overall visual style, including lighting, colors, textures, and composition.";
-            break;
+    Attributes:
+    - Lighting: ${isMatchLighting ? 'ANALYZE AND COPY FROM REFERENCE IMAGE' : params.lighting}
+    - Perspective: ${isMatchPerspective ? 'ANALYZE AND COPY FROM REFERENCE IMAGE' : params.perspective}
+    - Color Strategy: ${params.colorTheory}
+    
+    Instructions:
+    1. ANALYZE the attached Product Image. Identify colors and material.
+    2. Apply the Color Strategy to choose background colors.
+    3. Describe the scene, lighting, and mood.
+    4. CRITICAL: Start with "Preserve the exact details, shape, and text of the primary product."
+    `;
+
+    // Handle Style References (Studio only)
+    if (params.styleReferences && params.styleReferences.length > 0 && params.referenceTactic !== ReferenceTactic.IGNORE) {
+        for (const refImg of params.styleReferences) {
+            parts.push({
+                inlineData: {
+                    mimeType: refImg.mimeType,
+                    data: refImg.base64,
+                },
+            });
+        }
+        systemInstruction += `\n\n5. CRITICAL: Use the attached additional images as STYLE REFERENCES (Tactic: ${params.referenceTactic}). Extract their style/vibe into text descriptions.`;
+        
+        if (isMatchLighting) {
+           systemInstruction += `\n\n6. IMPORTANT: You MUST analyze the lighting in the reference image(s) and describe it exactly in the prompt to match.`;
+        }
+        if (isMatchPerspective) {
+           systemInstruction += `\n\n7. IMPORTANT: You MUST analyze the camera angle/perspective in the reference image(s) and describe it exactly in the prompt to match.`;
+        }
     }
 
-    userInstruction += `\n\n8. CRITICAL: ${params.styleReferences.length} Style Reference Image(s) are attached.
-    - TACTIC Selected: ${params.referenceTactic}.
-    - ${tacticSpecifics}
-    - Describe these specific attributes in detail so the generation model can replicate this aspect.
-    - Do NOT refer to them as "the reference images". The image generation model will NOT see these reference images, so you must translate their style completely into descriptive text words.
-    - Synthesize a cohesive style description from these references.`;
+  } else if (params.mode === AppMode.PORTRAIT) {
+    systemInstruction = `You are a professional portrait photographer.
+    Task: Write a descriptive prompt to change the background and lighting of a person's photo while preserving their identity.
     
-    // Append all style references
-    for (const refImg of params.styleReferences) {
-        parts.push({
-            inlineData: {
-                mimeType: refImg.mimeType,
-                data: refImg.base64,
-            },
-        });
-    }
+    Attributes:
+    - New Environment: ${params.portraitEnv}
+    - Vibe/Lighting: ${params.portraitVibe}
+    
+    Instructions:
+    1. ANALYZE the person in the image.
+    2. Describe a high-quality, realistic scene based on the 'New Environment'.
+    3. Describe the lighting based on 'Vibe'.
+    4. CRITICAL: Start with "Preserve the exact facial features, skin tone, hair, and identity of the person in the input image."
+    5. Output ONLY the raw prompt text.
+    `;
+  } else if (params.mode === AppMode.INTERIOR) {
+    systemInstruction = `You are an interior designer.
+    Task: Write a descriptive prompt to redecorate a room while keeping its structure.
+    
+    Attributes:
+    - Design Style: ${params.interiorStyle}
+    - Materials: ${params.interiorMaterial}
+    
+    Instructions:
+    1. ANALYZE the room's layout, window positions, and perspective.
+    2. Describe the room redecorated in the '${params.interiorStyle}' style.
+    3. Use '${params.interiorMaterial}' for furniture and textures.
+    4. CRITICAL: Start with "Preserve the exact structural perspective, walls, floor plan, and window placements of the room."
+    5. Output ONLY the raw prompt text.
+    `;
   }
 
-  parts.push({ text: userInstruction });
+  parts.push({ text: systemInstruction });
 
   try {
     const response = await ai.models.generateContent({
       model: PROMPT_MODEL,
       contents: { parts },
     });
-    return response.text?.trim() || "A high quality product photo. Preserve the product exactly.";
+    return response.text?.trim() || "Preserve the input image exactly.";
   } catch (error) {
     console.error("Error generating prompt:", error);
-    throw new Error("Failed to generate prompt. Please check your API key and try again.");
+    throw new Error("Failed to generate prompt.");
   }
 };
 
-/**
- * Generates the final image using Gemini Nano Banana (gemini-2.5-flash-image).
- * It takes the product image and the generated prompt.
- */
-export const generateProductImage = async (
-  productImage: ImageFile,
+export const generateImage = async (
+  inputImage: ImageFile,
   prompt: string,
   aspectRatio: AspectRatio
 ): Promise<string> => {
   const ai = getAIClient();
 
-  // 1. Resize/Pad the input image to match the target aspect ratio
-  // This ensures the composition is correct (e.g. 16:9 product shot) without the model
-  // having to stretch or guess the canvas bounds.
-  // We use PNG for the intermediate resized file to preserve quality.
   const resizedBase64 = await resizeImageToAspectRatio(
-    productImage.base64, 
-    productImage.mimeType, 
+    inputImage.base64, 
+    inputImage.mimeType, 
     aspectRatio
   );
 
@@ -175,8 +191,7 @@ export const generateProductImage = async (
       },
     },
     {
-      // Reinforce product preservation in the final call
-      text: "Preserve the exact details of the product. " + prompt,
+      text: prompt,
     },
   ];
 
@@ -185,14 +200,12 @@ export const generateProductImage = async (
       model: NANO_BANANA_MODEL,
       contents: { parts },
       config: {
-        // Nano banana supports aspectRatio in imageConfig
         imageConfig: {
           aspectRatio: aspectRatio,
         }
       },
     });
 
-    // Parse response for image
     const candidates = response.candidates;
     if (candidates && candidates.length > 0) {
       for (const part of candidates[0].content.parts) {
@@ -205,6 +218,6 @@ export const generateProductImage = async (
     throw new Error("No image data found in response.");
   } catch (error) {
     console.error("Error generating image:", error);
-    throw new Error("Failed to generate image. Please ensure your API key is valid for Gemini 2.5 models.");
+    throw new Error("Failed to generate image.");
   }
 };

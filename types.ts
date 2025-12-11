@@ -1,3 +1,10 @@
+
+export enum AppMode {
+  STUDIO = 'STUDIO',
+  PORTRAIT = 'PORTRAIT',
+  INTERIOR = 'INTERIOR',
+}
+
 export enum AspectRatio {
   SQUARE = '1:1',
   PORTRAIT = '3:4',
@@ -6,7 +13,9 @@ export enum AspectRatio {
   TALL = '9:16',
 }
 
+// --- STUDIO MODE TYPES ---
 export enum LightingStyle {
+  MATCH_REFERENCE = 'Match Reference Image', // NEW
   STUDIO = 'Studio Lighting',
   NATURAL = 'Natural Sunlight',
   NEON = 'Cyberpunk Neon',
@@ -16,6 +25,7 @@ export enum LightingStyle {
 }
 
 export enum CameraPerspective {
+  MATCH_REFERENCE = 'Match Reference Perspective', // NEW
   FRONT = 'Front View',
   ISOMETRIC = 'Isometric View',
   TOP_DOWN = 'Flat Lay (Top Down)',
@@ -46,6 +56,45 @@ export enum ReferenceTactic {
   IGNORE = 'Do Not Use Reference',
 }
 
+// --- PORTRAIT MODE TYPES ---
+export enum PortraitEnvironment {
+  OFFICE = 'Modern Office',
+  CAFE = 'Cozy Cafe',
+  NATURE = 'Outdoor Nature',
+  URBAN = 'Urban Street',
+  STUDIO_GREY = 'Professional Studio Grey',
+  LUXURY = 'Luxury Hotel Lobby',
+  BEACH = 'Sunset Beach',
+}
+
+export enum PortraitVibe {
+  PROFESSIONAL = 'Professional & Sharp',
+  CANDID = 'Candid & Soft',
+  DRAMATIC = 'Dramatic & High Contrast',
+  GOLDEN_HOUR = 'Warm Golden Hour',
+  BW = 'Black & White Artistic',
+}
+
+// --- INTERIOR MODE TYPES ---
+export enum InteriorStyle {
+  MINIMALIST = 'Minimalist',
+  INDUSTRIAL = 'Industrial Loft',
+  SCANDINAVIAN = 'Scandinavian (Japandi)',
+  MID_CENTURY = 'Mid-Century Modern',
+  BOHEMIAN = 'Bohemian',
+  LUXURY_CLASSIC = 'Luxury Classic',
+  CYBERPUNK = 'Cyberpunk / Gamer',
+}
+
+export enum InteriorMaterial {
+  WOOD_WHITE = 'Warm Wood & White',
+  CONCRETE_METAL = 'Concrete & Black Metal',
+  VELVET_GOLD = 'Velvet & Gold Accents',
+  EARTH_TONES = 'Natural Earth Tones',
+  MARBLE_GLASS = 'Marble & Glass',
+  COLORFUL = 'Vibrant & Colorful',
+}
+
 export interface GenerationState {
   isGeneratingPrompt: boolean;
   isGeneratingImage: boolean;
@@ -61,6 +110,7 @@ export interface ImageFile {
 
 export interface HistoryItem {
   id: string;
+  mode: AppMode;
   timestamp: number;
   imageUrl: string;
   prompt: string;
