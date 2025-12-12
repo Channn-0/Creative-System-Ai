@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Sparkles, Wand2, Download, AlertCircle, X, ZoomIn, 
     Sun, Moon, RefreshCw, Trash2
@@ -82,6 +82,121 @@ const App: React.FC = () => {
   }, [referenceTactic, styleImages, currentMode]);
 
   const activeInputImage = inputImages.length > 0 && inputImages[selectedImageIndex] ? inputImages[selectedImageIndex] : null;
+
+  // --- DATA & PRELOADING ---
+
+  // Image URL Generators
+  const getPreview = (keyword: string) => `https://image.pollinations.ai/prompt/${encodeURIComponent(keyword + " high quality 8k photorealistic") }?width=600&height=450&nologo=true`;
+  const getTubePreview = (styleDetail: string) => {
+    const baseSubject = "minimalist white cosmetic cream tube standing on a beige rectangular block podium, solid beige background, 3d render style product photography";
+    return `https://image.pollinations.ai/prompt/${encodeURIComponent(`${baseSubject}, ${styleDetail}, high quality 8k`) }?width=600&height=450&nologo=true`;
+  };
+
+  // Memoized Helper Data (Single Source of Truth)
+  const helperData = useMemo(() => ({
+    LIGHTING: {
+        title: "Lighting Styles",
+        items: [
+            { label: 'Match Reference', desc: 'Analyzes your uploaded reference photo and copies its lighting exactly.', imageUrl: getTubePreview('digital scanning grid effect, analyzing reference, split screen') },
+            { label: 'Studio', desc: 'Even, controlled lighting. Minimal shadows. Perfect for e-commerce.', imageUrl: getTubePreview('soft bright even studio lighting, white softbox reflection') },
+            { label: 'Natural', desc: 'Mimics sunlight. Soft shadows. Good for lifestyle and organic products.', imageUrl: getTubePreview('natural hard sunlight, leaf shadows, organic feel') },
+            { label: 'Cinematic', desc: 'High contrast, dramatic shadows, moody atmosphere. Adds mystery.', imageUrl: getTubePreview('dramatic cinematic lighting, low key, dark shadows, mystery') },
+            { label: 'Neon', desc: 'Cyberpunk style with colored rim lights (Blue/Pink). Tech & Gaming.', imageUrl: getTubePreview('cyberpunk neon blue and pink rim lighting, dark background') },
+            { label: 'Minimalist', desc: 'Very soft, diffused light. High-key white/grey background feel.', imageUrl: getTubePreview('minimalist high key lighting, very soft white diffusion, ethereal') },
+            { label: 'Product Boost', desc: 'Punchy, high key lighting designed specifically to make colors pop.', imageUrl: getTubePreview('vibrant commercial lighting, high saturation, sharp details') }
+        ]
+    },
+    ANGLE: {
+        title: "Camera Angles",
+        items: [
+            { label: 'Match Reference', desc: 'Mimics the exact camera position of your reference photo.', imageUrl: getTubePreview('digital viewfinder overlay, analyzing perspective') },
+            { label: 'Front', desc: 'Directly facing the subject. Standard listing shot.', imageUrl: getTubePreview('straight front view, eye level, symmetrical') },
+            { label: 'Isometric', desc: '3/4 view from above. Gives a 3D technical feel.', imageUrl: getTubePreview('isometric view, 3/4 angle from above, 3d technical look') },
+            { label: 'Flat Lay', desc: 'Directly from above (90 degrees). Good for collections and kits.', imageUrl: getTubePreview('flat lay, top down view directly above, 90 degrees') },
+            { label: 'Low Angle', desc: 'Camera looks up at product. Makes it look heroic/large.', imageUrl: getTubePreview('worm eye view, low angle looking up, heroic scale') },
+            { label: 'High Angle', desc: 'Looking down slightly. Good for showing depth and dimension.', imageUrl: getTubePreview('high angle looking down 45 degrees, depth') },
+            { label: 'Close Up', desc: 'Macro shot focusing on texture and details.', imageUrl: getTubePreview('extreme macro close up, focus on cap texture and details') },
+            { label: 'Dutch Angle', desc: 'Tilted camera for a dynamic, edgy, and energetic look.', imageUrl: getTubePreview('dutch angle, tilted camera frame, dynamic diagonal') }
+        ]
+    },
+    COLOR_THEORY: {
+        title: "Color Theory",
+        items: Object.values(ColorTheory).map(c => ({
+            label: c, 
+            desc: c === ColorTheory.AUTO ? 'AI analyzes product color and selects best matching background.' : 'Applies standard artistic color wheel rules to harmony.',
+            imageUrl: getPreview(`color palette ${c} artistic design composition`)
+        }))
+    },
+    PORTRAIT_ENV: {
+        title: "Portrait Environment",
+        items: [
+            { label: 'Modern Office', desc: 'Clean, professional workspace background with soft depth of field.', imageUrl: getPreview('modern corporate office interior blurred background') },
+            { label: 'Cozy Cafe', desc: 'Warm, ambient lighting with blurred coffee shop details. Casual & inviting.', imageUrl: getPreview('cozy coffee shop interior warm lighting blurred') },
+            { label: 'Nature', desc: 'Natural outdoor setting with greenery and dappled sunlight.', imageUrl: getPreview('outdoor nature park blurred background bokeh green') },
+            { label: 'Urban Street', desc: 'City streets, concrete textures, and dynamic urban energy.', imageUrl: getPreview('urban city street background blurred depth of field') },
+            { label: 'Studio Grey', desc: 'Classic neutral grey backdrop for pure focus on the subject.', imageUrl: getPreview('studio photography grey backdrop seamless') },
+            { label: 'Luxury Hotel', desc: 'High-end lobby aesthetic with warm lights, wood, and rich textures.', imageUrl: getPreview('luxury hotel lobby interior blurred background') },
+            { label: 'Sunset Beach', desc: 'Bright, airy coastal vibe with warm sand and sky tones.', imageUrl: getPreview('sunset beach coastal background blurred') }
+        ]
+    },
+    PORTRAIT_VIBE: {
+        title: "Vibe & Lighting",
+        items: [
+            { label: 'Professional', desc: 'Even, flattering lighting suitable for LinkedIn, CVs, and Corporate.', imageUrl: getPreview('professional headshot lighting clean sharp') },
+            { label: 'Candid & Soft', desc: 'Soft, natural light that feels unposed, authentic and friendly.', imageUrl: getPreview('soft natural light portrait photography candid') },
+            { label: 'Dramatic', desc: 'High contrast shadows and highlights for a moody, artistic look.', imageUrl: getPreview('dramatic portrait lighting chiaroscuro moody') },
+            { label: 'Golden Hour', desc: 'Warm, orange-hued lighting simulating sunset. Very flattering.', imageUrl: getPreview('golden hour sunset lighting portrait photography warm') },
+            { label: 'Black & White', desc: 'Artistic monochromatic processing with strong contrast and timeless feel.', imageUrl: getPreview('black and white artistic portrait photography high contrast') }
+        ]
+    },
+    INTERIOR_STYLE: {
+        title: "Design Style",
+        items: [
+            { label: 'Minimalist', desc: 'Clean lines, decluttered spaces, and monochromatic palettes.', imageUrl: getPreview('minimalist interior design living room white clean') },
+            { label: 'Industrial', desc: 'Raw elements like exposed brick, metal, and concrete. Loft vibes.', imageUrl: getPreview('industrial loft interior design brick concrete metal') },
+            { label: 'Scandinavian', desc: 'Bright, airy, functional with warm wood and white tones. Japandi.', imageUrl: getPreview('scandinavian interior design bright wood white japandi') },
+            { label: 'Mid-Century', desc: 'Retro aesthetic with organic curves, teak wood, and olive greens.', imageUrl: getPreview('mid century modern living room interior design') },
+            { label: 'Bohemian', desc: 'Eclectic, layered textures, plants, rugs, and relaxed vibes.', imageUrl: getPreview('bohemian interior design plants textures eclectic') },
+            { label: 'Luxury Classic', desc: 'Ornate details, moldings, chandeliers, and sophisticated elegance.', imageUrl: getPreview('luxury classic interior design chandelier molding') },
+            { label: 'Cyberpunk', desc: 'Neon lights, dark tones, and futuristic tech elements.', imageUrl: getPreview('cyberpunk interior room neon lights futuristic') }
+        ]
+    },
+    INTERIOR_MATERIAL: {
+        title: "Materials & Finishes",
+        items: [
+            { label: 'Wood & White', desc: 'Warm oak or walnut paired with crisp white surfaces.', imageUrl: getPreview('interior material board wood and white texture') },
+            { label: 'Concrete & Metal', desc: 'Urban, raw textures using grey concrete and black steel.', imageUrl: getPreview('interior material board concrete and black metal texture') },
+            { label: 'Velvet & Gold', desc: 'Soft, plush fabrics accented with metallic gold finishes.', imageUrl: getPreview('interior material board velvet fabric and gold texture') },
+            { label: 'Earth Tones', desc: 'Beige, terracotta, linen, and olive greens for a grounded feel.', imageUrl: getPreview('interior material board earth tones linen terracotta texture') },
+            { label: 'Marble & Glass', desc: 'Sleek, reflective surfaces denoting high-end luxury.', imageUrl: getPreview('interior material board white marble and glass texture') },
+            { label: 'Vibrant', desc: 'Bold, vibrant color combinations for a playful and energetic look.', imageUrl: getPreview('interior material board vibrant colorful patterns texture') }
+        ]
+    }
+  }), []);
+
+  // Preload Images Effect
+  useEffect(() => {
+    // Determine which categories to preload based on mode
+    const categoriesToPreload: (keyof typeof helperData)[] = [];
+    
+    if (currentMode === AppMode.STUDIO) {
+        categoriesToPreload.push('LIGHTING', 'ANGLE', 'COLOR_THEORY');
+    } else if (currentMode === AppMode.PORTRAIT) {
+        categoriesToPreload.push('PORTRAIT_ENV', 'PORTRAIT_VIBE');
+    } else if (currentMode === AppMode.INTERIOR) {
+        categoriesToPreload.push('INTERIOR_STYLE', 'INTERIOR_MATERIAL');
+    }
+
+    // Iterate and preload
+    categoriesToPreload.forEach(cat => {
+        helperData[cat].items.forEach(item => {
+            if (item.imageUrl) {
+                const img = new Image();
+                img.src = item.imageUrl;
+            }
+        });
+    });
+  }, [currentMode, helperData]);
 
   // --- ACTIONS ---
 
@@ -167,101 +282,20 @@ const App: React.FC = () => {
   // --- RENDER HELPERS ---
 
   const renderVisualHelper = () => {
-    let items: {label: string, desc: string, imageUrl?: string}[] = [];
-    let title = "";
+    if (!activeHelper) return null;
 
-    // Helper to generate a consistent image URL for the concept
-    // Using pollinations.ai for dynamic generation based on keywords which works great for these concepts
-    const getPreview = (keyword: string) => `https://image.pollinations.ai/prompt/${encodeURIComponent(keyword + " high quality 8k photorealistic") }?width=600&height=450&nologo=true`;
+    // Type assertion to ensure key access
+    const data = helperData[activeHelper as keyof typeof helperData];
 
-    switch(activeHelper) {
-        case 'LIGHTING':
-            title = "Lighting Styles";
-            items = [
-                { label: 'Match Reference', desc: 'Analyzes your uploaded reference photo and copies its lighting exactly.', imageUrl: getPreview('scanning analyzing photo reference digital interface') },
-                { label: 'Studio', desc: 'Even, controlled lighting. Minimal shadows. Perfect for e-commerce.', imageUrl: getPreview('clean bright studio lighting product photography white background') },
-                { label: 'Natural', desc: 'Mimics sunlight. Soft shadows. Good for lifestyle and organic products.', imageUrl: getPreview('natural sunlight window shadow product photography nature') },
-                { label: 'Cinematic', desc: 'High contrast, dramatic shadows, moody atmosphere. Adds mystery.', imageUrl: getPreview('cinematic moody lighting dramatic product photography dark') },
-                { label: 'Neon', desc: 'Cyberpunk style with colored rim lights (Blue/Pink). Tech & Gaming.', imageUrl: getPreview('neon cyberpunk lighting blue pink product photography') },
-                { label: 'Minimalist', desc: 'Very soft, diffused light. High-key white/grey background feel.', imageUrl: getPreview('soft minimalist white aesthetic product photography') },
-                { label: 'Product Boost', desc: 'Punchy, high key lighting designed specifically to make colors pop.', imageUrl: getPreview('vibrant commercial product photography popping colors') }
-            ];
-            break;
-        case 'ANGLE':
-            title = "Camera Angles";
-            items = [
-                { label: 'Match Reference', desc: 'Mimics the exact camera position of your reference photo.', imageUrl: getPreview('camera lens analyzing perspective digital') },
-                { label: 'Front', desc: 'Directly facing the subject. Standard listing shot.', imageUrl: getPreview('front view camera angle product photography') },
-                { label: 'Isometric', desc: '3/4 view from above. Gives a 3D technical feel.', imageUrl: getPreview('isometric 3d cube view white background') },
-                { label: 'Flat Lay', desc: 'Directly from above (90 degrees). Good for collections and kits.', imageUrl: getPreview('flat lay photography top down view desk') },
-                { label: 'Low Angle', desc: 'Camera looks up at product. Makes it look heroic/large.', imageUrl: getPreview('low angle photography looking up at skyscraper') },
-                { label: 'High Angle', desc: 'Looking down slightly. Good for showing depth and dimension.', imageUrl: getPreview('high angle photography looking down') },
-                { label: 'Close Up', desc: 'Macro shot focusing on texture and details.', imageUrl: getPreview('macro photography extreme close up detail texture') },
-                { label: 'Dutch Angle', desc: 'Tilted camera for a dynamic, edgy, and energetic look.', imageUrl: getPreview('dutch angle tilted camera photography dynamic') }
-            ];
-            break;
-        case 'COLOR_THEORY':
-            title = "Color Theory";
-            items = Object.values(ColorTheory).map(c => ({
-                label: c, 
-                desc: c === ColorTheory.AUTO ? 'AI analyzes product color and selects best matching background.' : 'Applies standard artistic color wheel rules to harmony.',
-                imageUrl: getPreview(`color palette ${c} artistic design composition`)
-            }));
-            break;
-        case 'PORTRAIT_ENV':
-            title = "Portrait Environment";
-            items = [
-                { label: 'Modern Office', desc: 'Clean, professional workspace background with soft depth of field.', imageUrl: getPreview('modern corporate office interior blurred background') },
-                { label: 'Cozy Cafe', desc: 'Warm, ambient lighting with blurred coffee shop details. Casual & inviting.', imageUrl: getPreview('cozy coffee shop interior warm lighting blurred') },
-                { label: 'Nature', desc: 'Natural outdoor setting with greenery and dappled sunlight.', imageUrl: getPreview('outdoor nature park blurred background bokeh green') },
-                { label: 'Urban Street', desc: 'City streets, concrete textures, and dynamic urban energy.', imageUrl: getPreview('urban city street background blurred depth of field') },
-                { label: 'Studio Grey', desc: 'Classic neutral grey backdrop for pure focus on the subject.', imageUrl: getPreview('studio photography grey backdrop seamless') },
-                { label: 'Luxury Hotel', desc: 'High-end lobby aesthetic with warm lights, wood, and rich textures.', imageUrl: getPreview('luxury hotel lobby interior blurred background') },
-                { label: 'Sunset Beach', desc: 'Bright, airy coastal vibe with warm sand and sky tones.', imageUrl: getPreview('sunset beach coastal background blurred') }
-            ];
-            break;
-        case 'PORTRAIT_VIBE':
-            title = "Vibe & Lighting";
-            items = [
-                { label: 'Professional', desc: 'Even, flattering lighting suitable for LinkedIn, CVs, and Corporate.', imageUrl: getPreview('professional headshot lighting clean sharp') },
-                { label: 'Candid & Soft', desc: 'Soft, natural light that feels unposed, authentic and friendly.', imageUrl: getPreview('soft natural light portrait photography candid') },
-                { label: 'Dramatic', desc: 'High contrast shadows and highlights for a moody, artistic look.', imageUrl: getPreview('dramatic portrait lighting chiaroscuro moody') },
-                { label: 'Golden Hour', desc: 'Warm, orange-hued lighting simulating sunset. Very flattering.', imageUrl: getPreview('golden hour sunset lighting portrait photography warm') },
-                { label: 'Black & White', desc: 'Artistic monochromatic processing with strong contrast and timeless feel.', imageUrl: getPreview('black and white artistic portrait photography high contrast') }
-            ];
-            break;
-        case 'INTERIOR_STYLE':
-            title = "Design Style";
-            items = [
-                { label: 'Minimalist', desc: 'Clean lines, decluttered spaces, and monochromatic palettes.', imageUrl: getPreview('minimalist interior design living room white clean') },
-                { label: 'Industrial', desc: 'Raw elements like exposed brick, metal, and concrete. Loft vibes.', imageUrl: getPreview('industrial loft interior design brick concrete metal') },
-                { label: 'Scandinavian', desc: 'Bright, airy, functional with warm wood and white tones. Japandi.', imageUrl: getPreview('scandinavian interior design bright wood white japandi') },
-                { label: 'Mid-Century', desc: 'Retro aesthetic with organic curves, teak wood, and olive greens.', imageUrl: getPreview('mid century modern living room interior design') },
-                { label: 'Bohemian', desc: 'Eclectic, layered textures, plants, rugs, and relaxed vibes.', imageUrl: getPreview('bohemian interior design plants textures eclectic') },
-                { label: 'Luxury Classic', desc: 'Ornate details, moldings, chandeliers, and sophisticated elegance.', imageUrl: getPreview('luxury classic interior design chandelier molding') },
-                { label: 'Cyberpunk', desc: 'Neon lights, dark tones, and futuristic tech elements.', imageUrl: getPreview('cyberpunk interior room neon lights futuristic') }
-            ];
-            break;
-        case 'INTERIOR_MATERIAL':
-            title = "Materials & Finishes";
-            items = [
-                { label: 'Wood & White', desc: 'Warm oak or walnut paired with crisp white surfaces.', imageUrl: getPreview('interior material board wood and white texture') },
-                { label: 'Concrete & Metal', desc: 'Urban, raw textures using grey concrete and black steel.', imageUrl: getPreview('interior material board concrete and black metal texture') },
-                { label: 'Velvet & Gold', desc: 'Soft, plush fabrics accented with metallic gold finishes.', imageUrl: getPreview('interior material board velvet fabric and gold texture') },
-                { label: 'Earth Tones', desc: 'Beige, terracotta, linen, and olive greens for a grounded feel.', imageUrl: getPreview('interior material board earth tones linen terracotta texture') },
-                { label: 'Marble & Glass', desc: 'Sleek, reflective surfaces denoting high-end luxury.', imageUrl: getPreview('interior material board white marble and glass texture') },
-                { label: 'Vibrant', desc: 'Bold, vibrant color combinations for a playful and energetic look.', imageUrl: getPreview('interior material board vibrant colorful patterns texture') }
-            ];
-            break;
-    }
+    if (!data) return null;
 
     return (
         <VisualHelper 
             isOpen={!!activeHelper}
             onClose={() => setActiveHelper(null)}
-            title={title}
+            title={data.title}
             description="Select the best option for your vision."
-            items={items}
+            items={data.items}
         />
     );
   };
