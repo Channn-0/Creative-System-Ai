@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
     Sparkles, Wand2, Download, AlertCircle, X, ZoomIn, 
-    Sun, Moon, HelpCircle, RefreshCw, Trash2
+    Sun, Moon, RefreshCw, Trash2
 } from 'lucide-react';
 import { ImageUpload } from './components/ImageUpload';
 import { Select } from './components/Select';
@@ -168,40 +169,90 @@ const App: React.FC = () => {
   const renderVisualHelper = () => {
     let items: {label: string, desc: string, imageUrl?: string}[] = [];
     let title = "";
-    
-    // Using placeholder services to represent the visual styles
-    const placeholderBase = "https://placehold.co/600x400/1e293b/FFF?text=";
 
-    if (activeHelper === 'LIGHTING') {
-        title = "Lighting Styles";
-        items = [
-            { label: 'Match Reference', desc: 'Analyzes your uploaded reference photo and copies its lighting exactly.', imageUrl: placeholderBase + "Reference+Match" },
-            { label: 'Studio', desc: 'Even, controlled lighting. Minimal shadows. Perfect for e-commerce.', imageUrl: placeholderBase + "Studio+Light" },
-            { label: 'Natural', desc: 'Mimics sunlight. Soft shadows. Good for lifestyle.', imageUrl: placeholderBase + "Natural+Sunlight" },
-            { label: 'Cinematic', desc: 'High contrast, dramatic shadows, moody atmosphere.', imageUrl: placeholderBase + "Cinematic+Mood" },
-            { label: 'Neon', desc: 'Cyberpunk style with colored rim lights (Blue/Pink).', imageUrl: placeholderBase + "Neon+Cyberpunk" },
-            { label: 'Minimalist', desc: 'Very soft, diffused light. White/Grey background feel.', imageUrl: placeholderBase + "Minimalist+Soft" },
-            { label: 'Product Boost', desc: 'High key lighting designed to make colors pop.', imageUrl: placeholderBase + "Product+Boost" }
-        ];
-    } else if (activeHelper === 'ANGLE') {
-        title = "Camera Angles";
-        items = [
-            { label: 'Match Reference', desc: 'Mimics the exact camera position of your reference photo.', imageUrl: placeholderBase + "Ref+Perspective" },
-            { label: 'Front', desc: 'Directly facing the subject. Standard listing shot.', imageUrl: placeholderBase + "Front+View" },
-            { label: 'Isometric', desc: '3/4 view from above. Gives a 3D technical feel.', imageUrl: placeholderBase + "Isometric" },
-            { label: 'Flat Lay', desc: 'Directly from above (90 degrees). Good for collections.', imageUrl: placeholderBase + "Flat+Lay" },
-            { label: 'Low Angle', desc: 'Camera looks up at product. Makes it look heroic/large.', imageUrl: placeholderBase + "Low+Angle" },
-            { label: 'High Angle', desc: 'Looking down slightly. Good for showing depth.', imageUrl: placeholderBase + "High+Angle" },
-            { label: 'Close Up', desc: 'Macro shot focusing on texture and details.', imageUrl: placeholderBase + "Macro+CloseUp" },
-            { label: 'Dutch Angle', desc: 'Tilted camera for a dynamic, edgy look.', imageUrl: placeholderBase + "Dutch+Tilt" }
-        ];
-    } else {
-        title = "Color Theory";
-        items = Object.values(ColorTheory).map(c => ({
-            label: c, 
-            desc: c === ColorTheory.AUTO ? 'AI decides based on product color.' : 'Applies standard color wheel rules.',
-            imageUrl: placeholderBase + c.replace(/\s+/g, '+')
-        }));
+    // Helper to generate a consistent image URL for the concept
+    // Using pollinations.ai for dynamic generation based on keywords which works great for these concepts
+    const getPreview = (keyword: string) => `https://image.pollinations.ai/prompt/${encodeURIComponent(keyword + " high quality 8k photorealistic") }?width=600&height=450&nologo=true`;
+
+    switch(activeHelper) {
+        case 'LIGHTING':
+            title = "Lighting Styles";
+            items = [
+                { label: 'Match Reference', desc: 'Analyzes your uploaded reference photo and copies its lighting exactly.', imageUrl: getPreview('scanning analyzing photo reference digital interface') },
+                { label: 'Studio', desc: 'Even, controlled lighting. Minimal shadows. Perfect for e-commerce.', imageUrl: getPreview('clean bright studio lighting product photography white background') },
+                { label: 'Natural', desc: 'Mimics sunlight. Soft shadows. Good for lifestyle and organic products.', imageUrl: getPreview('natural sunlight window shadow product photography nature') },
+                { label: 'Cinematic', desc: 'High contrast, dramatic shadows, moody atmosphere. Adds mystery.', imageUrl: getPreview('cinematic moody lighting dramatic product photography dark') },
+                { label: 'Neon', desc: 'Cyberpunk style with colored rim lights (Blue/Pink). Tech & Gaming.', imageUrl: getPreview('neon cyberpunk lighting blue pink product photography') },
+                { label: 'Minimalist', desc: 'Very soft, diffused light. High-key white/grey background feel.', imageUrl: getPreview('soft minimalist white aesthetic product photography') },
+                { label: 'Product Boost', desc: 'Punchy, high key lighting designed specifically to make colors pop.', imageUrl: getPreview('vibrant commercial product photography popping colors') }
+            ];
+            break;
+        case 'ANGLE':
+            title = "Camera Angles";
+            items = [
+                { label: 'Match Reference', desc: 'Mimics the exact camera position of your reference photo.', imageUrl: getPreview('camera lens analyzing perspective digital') },
+                { label: 'Front', desc: 'Directly facing the subject. Standard listing shot.', imageUrl: getPreview('front view camera angle product photography') },
+                { label: 'Isometric', desc: '3/4 view from above. Gives a 3D technical feel.', imageUrl: getPreview('isometric 3d cube view white background') },
+                { label: 'Flat Lay', desc: 'Directly from above (90 degrees). Good for collections and kits.', imageUrl: getPreview('flat lay photography top down view desk') },
+                { label: 'Low Angle', desc: 'Camera looks up at product. Makes it look heroic/large.', imageUrl: getPreview('low angle photography looking up at skyscraper') },
+                { label: 'High Angle', desc: 'Looking down slightly. Good for showing depth and dimension.', imageUrl: getPreview('high angle photography looking down') },
+                { label: 'Close Up', desc: 'Macro shot focusing on texture and details.', imageUrl: getPreview('macro photography extreme close up detail texture') },
+                { label: 'Dutch Angle', desc: 'Tilted camera for a dynamic, edgy, and energetic look.', imageUrl: getPreview('dutch angle tilted camera photography dynamic') }
+            ];
+            break;
+        case 'COLOR_THEORY':
+            title = "Color Theory";
+            items = Object.values(ColorTheory).map(c => ({
+                label: c, 
+                desc: c === ColorTheory.AUTO ? 'AI analyzes product color and selects best matching background.' : 'Applies standard artistic color wheel rules to harmony.',
+                imageUrl: getPreview(`color palette ${c} artistic design composition`)
+            }));
+            break;
+        case 'PORTRAIT_ENV':
+            title = "Portrait Environment";
+            items = [
+                { label: 'Modern Office', desc: 'Clean, professional workspace background with soft depth of field.', imageUrl: getPreview('modern corporate office interior blurred background') },
+                { label: 'Cozy Cafe', desc: 'Warm, ambient lighting with blurred coffee shop details. Casual & inviting.', imageUrl: getPreview('cozy coffee shop interior warm lighting blurred') },
+                { label: 'Nature', desc: 'Natural outdoor setting with greenery and dappled sunlight.', imageUrl: getPreview('outdoor nature park blurred background bokeh green') },
+                { label: 'Urban Street', desc: 'City streets, concrete textures, and dynamic urban energy.', imageUrl: getPreview('urban city street background blurred depth of field') },
+                { label: 'Studio Grey', desc: 'Classic neutral grey backdrop for pure focus on the subject.', imageUrl: getPreview('studio photography grey backdrop seamless') },
+                { label: 'Luxury Hotel', desc: 'High-end lobby aesthetic with warm lights, wood, and rich textures.', imageUrl: getPreview('luxury hotel lobby interior blurred background') },
+                { label: 'Sunset Beach', desc: 'Bright, airy coastal vibe with warm sand and sky tones.', imageUrl: getPreview('sunset beach coastal background blurred') }
+            ];
+            break;
+        case 'PORTRAIT_VIBE':
+            title = "Vibe & Lighting";
+            items = [
+                { label: 'Professional', desc: 'Even, flattering lighting suitable for LinkedIn, CVs, and Corporate.', imageUrl: getPreview('professional headshot lighting clean sharp') },
+                { label: 'Candid & Soft', desc: 'Soft, natural light that feels unposed, authentic and friendly.', imageUrl: getPreview('soft natural light portrait photography candid') },
+                { label: 'Dramatic', desc: 'High contrast shadows and highlights for a moody, artistic look.', imageUrl: getPreview('dramatic portrait lighting chiaroscuro moody') },
+                { label: 'Golden Hour', desc: 'Warm, orange-hued lighting simulating sunset. Very flattering.', imageUrl: getPreview('golden hour sunset lighting portrait photography warm') },
+                { label: 'Black & White', desc: 'Artistic monochromatic processing with strong contrast and timeless feel.', imageUrl: getPreview('black and white artistic portrait photography high contrast') }
+            ];
+            break;
+        case 'INTERIOR_STYLE':
+            title = "Design Style";
+            items = [
+                { label: 'Minimalist', desc: 'Clean lines, decluttered spaces, and monochromatic palettes.', imageUrl: getPreview('minimalist interior design living room white clean') },
+                { label: 'Industrial', desc: 'Raw elements like exposed brick, metal, and concrete. Loft vibes.', imageUrl: getPreview('industrial loft interior design brick concrete metal') },
+                { label: 'Scandinavian', desc: 'Bright, airy, functional with warm wood and white tones. Japandi.', imageUrl: getPreview('scandinavian interior design bright wood white japandi') },
+                { label: 'Mid-Century', desc: 'Retro aesthetic with organic curves, teak wood, and olive greens.', imageUrl: getPreview('mid century modern living room interior design') },
+                { label: 'Bohemian', desc: 'Eclectic, layered textures, plants, rugs, and relaxed vibes.', imageUrl: getPreview('bohemian interior design plants textures eclectic') },
+                { label: 'Luxury Classic', desc: 'Ornate details, moldings, chandeliers, and sophisticated elegance.', imageUrl: getPreview('luxury classic interior design chandelier molding') },
+                { label: 'Cyberpunk', desc: 'Neon lights, dark tones, and futuristic tech elements.', imageUrl: getPreview('cyberpunk interior room neon lights futuristic') }
+            ];
+            break;
+        case 'INTERIOR_MATERIAL':
+            title = "Materials & Finishes";
+            items = [
+                { label: 'Wood & White', desc: 'Warm oak or walnut paired with crisp white surfaces.', imageUrl: getPreview('interior material board wood and white texture') },
+                { label: 'Concrete & Metal', desc: 'Urban, raw textures using grey concrete and black steel.', imageUrl: getPreview('interior material board concrete and black metal texture') },
+                { label: 'Velvet & Gold', desc: 'Soft, plush fabrics accented with metallic gold finishes.', imageUrl: getPreview('interior material board velvet fabric and gold texture') },
+                { label: 'Earth Tones', desc: 'Beige, terracotta, linen, and olive greens for a grounded feel.', imageUrl: getPreview('interior material board earth tones linen terracotta texture') },
+                { label: 'Marble & Glass', desc: 'Sleek, reflective surfaces denoting high-end luxury.', imageUrl: getPreview('interior material board white marble and glass texture') },
+                { label: 'Vibrant', desc: 'Bold, vibrant color combinations for a playful and energetic look.', imageUrl: getPreview('interior material board vibrant colorful patterns texture') }
+            ];
+            break;
     }
 
     return (
@@ -209,7 +260,7 @@ const App: React.FC = () => {
             isOpen={!!activeHelper}
             onClose={() => setActiveHelper(null)}
             title={title}
-            description="Visual guide to help you choose the best setting."
+            description="Select the best option for your vision."
             items={items}
         />
     );
@@ -333,11 +384,23 @@ const App: React.FC = () => {
             
             {/* Header (Desktop + Mobile Row) */}
             <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-900 pb-4 lg:pb-6 sticky top-0 bg-white/95 dark:bg-slate-950/95 backdrop-blur z-30 pt-2 lg:pt-0">
-               <div className="flex items-center gap-3 lg:gap-4">
-                 <span className="font-extrabold text-2xl lg:text-3xl tracking-tight">N.<span className="text-brand-400">ERA</span></span>
-                 <div className="h-4 lg:h-6 w-px bg-slate-200 dark:bg-slate-800"></div>
-                 <span className="text-[10px] lg:text-xs font-bold bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400 px-2 lg:px-3 py-1 lg:py-1.5 rounded-full uppercase tracking-wide truncate max-w-[100px] lg:max-w-none">{currentMode} Mode</span>
+               <div className="flex items-center gap-3">
+                 {/* Logo Icon */}
+                 <div className="w-8 h-8 lg:w-10 lg:h-10 bg-slate-900 dark:bg-slate-800 rounded-xl flex items-center justify-center shadow-lg shadow-brand-400/10 border border-slate-800 dark:border-slate-700">
+                    <Sparkles className="w-4 h-4 lg:w-5 lg:h-5 text-brand-400" />
+                 </div>
+                 
+                 <span className="font-extrabold text-2xl lg:text-3xl tracking-tight text-slate-900 dark:text-white">
+                    N.<span className="text-brand-400">ERA</span>
+                 </span>
+                 
+                 <div className="h-4 lg:h-6 w-px bg-slate-200 dark:bg-slate-800 mx-1 lg:mx-2"></div>
+                 
+                 <span className="text-[10px] lg:text-xs font-bold bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400 px-2 lg:px-3 py-1 lg:py-1.5 rounded-full uppercase tracking-wide truncate max-w-[100px] lg:max-w-none">
+                    {currentMode} Mode
+                 </span>
                </div>
+
                <div className="flex items-center gap-1 lg:gap-2">
                  {(inputImages.length > 0 || generatedImageUrl) && (
                      <Button variant="ghost" className="!p-1.5 lg:!p-2 rounded-full text-red-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10" onClick={handleReset} title="Reset Canvas">
@@ -420,17 +483,29 @@ const App: React.FC = () => {
                         {currentMode === AppMode.STUDIO && (
                             <>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="relative">
-                                    <Select label="Lighting" options={Object.values(LightingStyle).map(v => ({value:v, label:v}))} value={lighting} onChange={(e) => setLighting(e.target.value as LightingStyle)} className="h-10 lg:h-12" />
-                                    <button onClick={() => setActiveHelper('LIGHTING')} className="absolute top-0 right-0 text-slate-400 hover:text-brand-400 p-1"><HelpCircle size={14} /></button>
-                                </div>
-                                <div className="relative">
-                                    <Select label="Camera Angle" options={Object.values(CameraPerspective).map(v => ({value:v, label:v}))} value={perspective} onChange={(e) => setPerspective(e.target.value as CameraPerspective)} className="h-10 lg:h-12" />
-                                    <button onClick={() => setActiveHelper('ANGLE')} className="absolute top-0 right-0 text-slate-400 hover:text-brand-400 p-1"><HelpCircle size={14} /></button>
-                                </div>
+                                <Select 
+                                    label="Lighting" 
+                                    options={Object.values(LightingStyle).map(v => ({value:v, label:v}))} 
+                                    value={lighting} 
+                                    onChange={(e) => setLighting(e.target.value as LightingStyle)} 
+                                    onHelp={() => setActiveHelper('LIGHTING')}
+                                />
+                                <Select 
+                                    label="Camera Angle" 
+                                    options={Object.values(CameraPerspective).map(v => ({value:v, label:v}))} 
+                                    value={perspective} 
+                                    onChange={(e) => setPerspective(e.target.value as CameraPerspective)} 
+                                    onHelp={() => setActiveHelper('ANGLE')}
+                                />
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <Select label="Color Theory" options={Object.values(ColorTheory).map(v => ({value:v, label:v}))} value={colorTheory} onChange={(e) => setColorTheory(e.target.value as ColorTheory)} className="h-10 lg:h-12" />
+                                <Select 
+                                    label="Color Theory" 
+                                    options={Object.values(ColorTheory).map(v => ({value:v, label:v}))} 
+                                    value={colorTheory} 
+                                    onChange={(e) => setColorTheory(e.target.value as ColorTheory)}
+                                    onHelp={() => setActiveHelper('COLOR_THEORY')}
+                                />
                             </div>
                             </>
                         )}
@@ -438,16 +513,40 @@ const App: React.FC = () => {
                         {/* PORTRAIT CONTROLS */}
                         {currentMode === AppMode.PORTRAIT && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <Select label="Environment" options={Object.values(PortraitEnvironment).map(v => ({value:v, label:v}))} value={portraitEnv} onChange={(e) => setPortraitEnv(e.target.value as PortraitEnvironment)} className="h-10 lg:h-12" />
-                            <Select label="Vibe & Lighting" options={Object.values(PortraitVibe).map(v => ({value:v, label:v}))} value={portraitVibe} onChange={(e) => setPortraitVibe(e.target.value as PortraitVibe)} className="h-10 lg:h-12" />
+                                <Select 
+                                    label="Environment" 
+                                    options={Object.values(PortraitEnvironment).map(v => ({value:v, label:v}))} 
+                                    value={portraitEnv} 
+                                    onChange={(e) => setPortraitEnv(e.target.value as PortraitEnvironment)} 
+                                    onHelp={() => setActiveHelper('PORTRAIT_ENV')}
+                                />
+                                <Select 
+                                    label="Vibe & Lighting" 
+                                    options={Object.values(PortraitVibe).map(v => ({value:v, label:v}))} 
+                                    value={portraitVibe} 
+                                    onChange={(e) => setPortraitVibe(e.target.value as PortraitVibe)} 
+                                    onHelp={() => setActiveHelper('PORTRAIT_VIBE')}
+                                />
                             </div>
                         )}
 
                         {/* INTERIOR CONTROLS */}
                         {currentMode === AppMode.INTERIOR && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <Select label="Design Style" options={Object.values(InteriorStyle).map(v => ({value:v, label:v}))} value={interiorStyle} onChange={(e) => setInteriorStyle(e.target.value as InteriorStyle)} className="h-10 lg:h-12" />
-                            <Select label="Materials" options={Object.values(InteriorMaterial).map(v => ({value:v, label:v}))} value={interiorMaterial} onChange={(e) => setInteriorMaterial(e.target.value as InteriorMaterial)} className="h-10 lg:h-12" />
+                                <Select 
+                                    label="Design Style" 
+                                    options={Object.values(InteriorStyle).map(v => ({value:v, label:v}))} 
+                                    value={interiorStyle} 
+                                    onChange={(e) => setInteriorStyle(e.target.value as InteriorStyle)} 
+                                    onHelp={() => setActiveHelper('INTERIOR_STYLE')}
+                                />
+                                <Select 
+                                    label="Materials" 
+                                    options={Object.values(InteriorMaterial).map(v => ({value:v, label:v}))} 
+                                    value={interiorMaterial} 
+                                    onChange={(e) => setInteriorMaterial(e.target.value as InteriorMaterial)} 
+                                    onHelp={() => setActiveHelper('INTERIOR_MATERIAL')}
+                                />
                             </div>
                         )}
                     </div>

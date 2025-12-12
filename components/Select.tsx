@@ -1,4 +1,6 @@
+
 import React from 'react';
+import { HelpCircle } from 'lucide-react';
 
 interface SelectOption {
   value: string;
@@ -8,14 +10,26 @@ interface SelectOption {
 interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label: string;
   options: SelectOption[];
+  onHelp?: () => void;
 }
 
-export const Select: React.FC<SelectProps> = ({ label, options, className = '', ...props }) => {
+export const Select: React.FC<SelectProps> = ({ label, options, onHelp, className = '', ...props }) => {
   return (
-    <div className="w-full">
-      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 ml-1">
-        {label}
-      </label>
+    <div className="w-full relative">
+      <div className="flex justify-between items-center mb-1.5 ml-1">
+        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          {label}
+        </label>
+        {onHelp && (
+          <button 
+            onClick={onHelp}
+            className="text-slate-400 hover:text-brand-400 transition-colors p-0.5"
+            title="View Visual Guide"
+          >
+            <HelpCircle size={14} />
+          </button>
+        )}
+      </div>
       <div className="relative">
         <select
           className={`
@@ -25,7 +39,7 @@ export const Select: React.FC<SelectProps> = ({ label, options, className = '', 
             text-slate-900 dark:text-slate-200 
             text-sm rounded-xl
             focus:ring-2 focus:ring-brand-400 focus:border-transparent 
-            block p-3 pr-8
+            block py-2.5 px-3 pr-8
             transition-all duration-200
             disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-800
             ${className}
