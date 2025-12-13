@@ -10,6 +10,9 @@ import { Button } from './components/Button';
 import { HistorySidebar } from './components/HistorySidebar';
 import { Navigation } from './components/Navigation';
 import { VisualHelper } from './components/VisualHelper';
+import { StudioPanel } from './components/modes/StudioPanel';
+import { PortraitPanel } from './components/modes/PortraitPanel';
+import { InteriorPanel } from './components/modes/InteriorPanel';
 import { 
     AppMode,
     AspectRatio, LightingStyle, CameraPerspective, ColorTheory, ReferenceTactic, 
@@ -20,7 +23,331 @@ import {
 import { generateOptimizedPrompt, generateImage } from './services/gemini';
 import { downloadImage } from './utils';
 
-// --- COLOR WHEEL SVG GENERATOR ---
+// --- SVG GENERATORS (INSTANT PREVIEWS) ---
+
+const generateLightingPreview = (type: LightingStyle): string => {
+    const w = 400; const h = 300;
+    const cx = w/2; const cy = h/2;
+    
+    // TUBE GEOMETRY (Standard Front View)
+    // Standing on cap
+    const capW = 50; const capH = 25;
+    const bodyW_bottom = 50; const bodyW_top = 70;
+    const bodyH = 110;
+    const crimpH = 15;
+    
+    // Coordinates
+    const capY = cy + 40;
+    const bodyY_bottom = capY;
+    const bodyY_top = bodyY_bottom - bodyH;
+    
+    const tubePath = `
+        M ${cx - bodyW_bottom/2} ${bodyY_bottom} 
+        L ${cx - bodyW_top/2} ${bodyY_top} 
+        L ${cx + bodyW_top/2} ${bodyY_top} 
+        L ${cx + bodyW_bottom/2} ${bodyY_bottom} 
+        Z`;
+        
+    const crimpPath = `
+        M ${cx - bodyW_top/2 - 2} ${bodyY_top}
+        L ${cx - bodyW_top/2 - 2} ${bodyY_top - crimpH}
+        L ${cx + bodyW_top/2 + 2} ${bodyY_top - crimpH}
+        L ${cx + bodyW_top/2 + 2} ${bodyY_top}
+        Z`;
+
+    const capPath = `
+        M ${cx - capW/2} ${capY}
+        L ${cx - capW/2} ${capY + capH}
+        Q ${cx} ${capY + capH + 5} ${cx + capW/2} ${capY + capH}
+        L ${cx + capW/2} ${capY}
+        Z`;
+
+    let defs = '';
+    let content = '';
+    
+    switch (type) {
+        case LightingStyle.STUDIO:
+            // Soft Gradient
+            defs = `
+                <linearGradient id="studioTube" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stop-color="#cbd5e1"/>
+                    <stop offset="40%" stop-color="#ffffff"/>
+                    <stop offset="60%" stop-color="#ffffff"/>
+                    <stop offset="100%" stop-color="#94a3b8"/>
+                </linearGradient>
+                <filter id="softShadow" x="-50%" y="0" width="200%" height="200%">
+                    <feGaussianBlur in="SourceAlpha" stdDeviation="5"/>
+                    <feOffset dy="5" result="offsetblur"/>
+                    <feComponentTransfer><feFuncA type="linear" slope="0.3"/></feComponentTransfer>
+                    <feMerge><feMergeNode in="offsetblur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+            `;
+            content = `
+                <rect x="0" y="0" width="${w}" height="${h}" fill="#e2e8f0" />
+                <path d="${capPath}" fill="#475569" filter="url(#softShadow)" />
+                <path d="${tubePath}" fill="url(#studioTube)" filter="url(#softShadow)" />
+                <path d="${crimpPath}" fill="#e2e8f0" stroke="#cbd5e1" filter="url(#softShadow)" />
+            `;
+            break;
+
+        case LightingStyle.NATURAL:
+            // Hard Shadow + Warmth
+            defs = `<filter id="leaf" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur in="SourceGraphic" stdDeviation="3" /></filter>`;
+            content = `
+                <rect x="0" y="0" width="${w}" height="${h}" fill="#f1f5f9" />
+                <!-- Shadow -->
+                <g transform="skewX(-30) translate(120, 0)" opacity="0.2" fill="#000">
+                     <path d="${capPath}" />
+                     <path d="${tubePath}" />
+                     <path d="${crimpPath}" />
+                </g>
+                <!-- Tube -->
+                <g>
+                    <path d="${capPath}" fill="#64748b" />
+                    <path d="${tubePath}" fill="#ffffff" />
+                    <path d="${crimpPath}" fill="#f1f5f9" />
+                </g>
+                <!-- Leaf Shadow Overlay -->
+                <path d="M${cx-150} ${cy-150} C${cx} ${cy-50}, ${cx+50} ${cy+50}, ${cx+200} ${cy+200}" stroke="#000" stroke-width="80" opacity="0.05" filter="url(#leaf)"/>
+            `;
+            break;
+
+        case LightingStyle.CINEMATIC:
+            // Revised: Sharper silhouette with stronger rim light
+            content = `
+                <rect x="0" y="0" width="${w}" height="${h}" fill="#0a0a0a" />
+                <defs>
+                    <linearGradient id="cineLight" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stop-color="#000"/>
+                        <stop offset="40%" stop-color="#1e293b"/>
+                        <stop offset="60%" stop-color="#fff"/> 
+                        <stop offset="100%" stop-color="#334155"/>
+                   </linearGradient>
+                </defs>
+                
+                <!-- Strong Spotlight Beam from Right -->
+                <path d="M${w} 0 L${cx-40} ${h} L${w} ${h} Z" fill="#fff" opacity="0.07" />
+                
+                <g>
+                     <path d="${capPath}" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+                     <path d="${tubePath}" fill="url(#cineLight)" />
+                     <path d="${crimpPath}" fill="url(#cineLight)" />
+                </g>
+            `;
+            break;
+
+        case LightingStyle.NEON:
+            // Rim lights
+            content = `
+                 <rect x="0" y="0" width="${w}" height="${h}" fill="#0a0a0a" />
+                 <defs>
+                    <filter id="neonGlow" x="-50%" y="-50%" width="200%" height="200%">
+                        <feGaussianBlur stdDeviation="5" result="coloredBlur"/>
+                        <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                    </filter>
+                 </defs>
+                 <g filter="url(#neonGlow)">
+                    <path d="${capPath}" stroke="#ec4899" stroke-width="3" fill="#171717" />
+                    <path d="${tubePath}" stroke="#3b82f6" stroke-width="3" fill="#171717" />
+                    <path d="${crimpPath}" stroke="#ec4899" stroke-width="3" fill="#171717" />
+                 </g>
+            `;
+            break;
+
+        case LightingStyle.MINIMALIST:
+            // Flat, low contrast
+            content = `
+                <rect x="0" y="0" width="${w}" height="${h}" fill="#f8fafc" />
+                <g opacity="0.8">
+                    <path d="${capPath}" fill="#cbd5e1" />
+                    <path d="${tubePath}" fill="#ffffff" stroke="#e2e8f0" />
+                    <path d="${crimpPath}" fill="#f1f5f9" stroke="#e2e8f0" />
+                </g>
+            `;
+            break;
+
+        case LightingStyle.PRODUCT_BOOST:
+            // Vibrant Background
+            content = `
+                <rect x="0" y="0" width="${w}" height="${h}" fill="#facc15" />
+                <circle cx="${cx}" cy="${cy}" r="120" fill="#fef08a" opacity="0.5" />
+                <g filter="drop-shadow(0px 10px 10px rgba(0,0,0,0.2))">
+                    <path d="${capPath}" fill="#334155" />
+                    <path d="${tubePath}" fill="#ffffff" />
+                    <path d="${crimpPath}" fill="#ffffff" />
+                </g>
+                <!-- Specular Highlight -->
+                <rect x="${cx-15}" y="${bodyY_top + 10}" width="10" height="80" fill="white" opacity="0.4" rx="5" />
+            `;
+            break;
+
+        case LightingStyle.MATCH_REFERENCE:
+            // Scanline
+            content = `
+                <rect x="0" y="0" width="${w}" height="${h}" fill="#1e293b" />
+                <g stroke="#ffffff" stroke-width="2" fill="none" opacity="0.5">
+                    <path d="${capPath}" stroke-dasharray="4 4" />
+                    <path d="${tubePath}" stroke-dasharray="4 4" />
+                    <path d="${crimpPath}" stroke-dasharray="4 4" />
+                </g>
+                <rect x="0" y="${cy}" width="${w}" height="2" fill="#3b82f6" opacity="0.8">
+                    <animate attributeName="y" from="0" to="${h}" duration="2s" repeatCount="indefinite" />
+                </rect>
+            `;
+            break;
+    }
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">${defs}${content}</svg>`;
+    return `data:image/svg+xml;base64,${btoa(svg)}`;
+};
+
+const generateAnglePreview = (angle: CameraPerspective): string => {
+    const w = 400; const h = 300;
+    const cx = w/2; const cy = h/2;
+    const bg = "#334155";
+    
+    // Geometry Colors for Tube
+    const cTube = "#f1f5f9";
+    const cCap = "#475569";
+    const cHighlight = "#ffffff";
+
+    let content = '';
+
+    // Helper for Camera Icon
+    const drawCamera = (scale = 1, rotate = 0, extraSvg = '') => `
+        <g transform="translate(${cx}, ${cy}) rotate(${rotate}) scale(${scale}) translate(-${cx}, -${cy})">
+            <!-- Camera Body -->
+            <rect x="${cx-60}" y="${cy-40}" width="120" height="80" rx="10" fill="none" stroke="white" stroke-width="4"/>
+            <!-- Lens -->
+            <circle cx="${cx}" cy="${cy}" r="25" fill="none" stroke="white" stroke-width="4"/>
+            <!-- Flash/Viewfinder Bump -->
+            <rect x="${cx+20}" y="${cy-55}" width="20" height="15" fill="white"/>
+            ${extraSvg}
+        </g>
+    `;
+
+    switch (angle) {
+        case CameraPerspective.FRONT:
+             // 2D Flat Front View (Tube)
+             content = `
+                <rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" />
+                <g transform="translate(${cx}, ${cy})">
+                    <!-- Crimp -->
+                    <rect x="-35" y="-60" width="70" height="15" fill="${cTube}" />
+                    <!-- Body -->
+                    <path d="M -25 60 L -35 -45 L 35 -45 L 25 60 Z" fill="${cTube}" />
+                    <!-- Cap -->
+                    <rect x="-25" y="60" width="50" height="25" fill="${cCap}" />
+                    <!-- Highlight -->
+                    <rect x="-10" y="-40" width="5" height="90" fill="${cHighlight}" opacity="0.3" />
+                    <text x="0" y="110" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">FRONT</text>
+                </g>
+             `;
+            break;
+
+        case CameraPerspective.TOP_DOWN:
+             // Flat Lay (Tube)
+             content = `
+                <rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" />
+                <g transform="rotate(-90 ${cx} ${cy}) translate(0, -10)">
+                    <path d="M ${cx-30} ${cy+65} L ${cx-40} ${cy-45} L ${cx+40} ${cy-45} L ${cx+30} ${cy+65} Z" fill="black" opacity="0.3" filter="blur(4px)" transform="translate(5, 5)" />
+                    <rect x="${cx - 25}" y="${cy + 60}" width="50" height="25" fill="${cCap}" />
+                    <path d="M ${cx - 25} ${cy + 60} L ${cx - 35} ${cy - 50} L ${cx + 35} ${cy - 50} L ${cx + 25} ${cy + 60} Z" fill="${cTube}" />
+                    <rect x="${cx - 35}" y="${cy - 65}" width="70" height="15" fill="#e2e8f0" />
+                </g>
+                <text x="${cx}" y="${cy+120}" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">FLAT LAY</text>
+            `;
+            break;
+
+        case CameraPerspective.ISOMETRIC:
+             // 3D Boxy View (Tube)
+             content = `
+                <rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" />
+                <g transform="translate(${cx}, ${cy})">
+                    <path d="M -25 60 L -25 85 L 25 85 L 25 60 Z" fill="${cCap}" />
+                    <path d="M 25 60 L 25 85 L 45 65 L 45 40 Z" fill="#334155" opacity="0.5"/>
+                    <path d="M -25 60 L -35 -45 L 35 -45 L 25 60 Z" fill="${cTube}" />
+                    <path d="M 25 60 L 35 -45 L 55 -65 L 45 40 Z" fill="#cbd5e1" />
+                    <path d="M -35 -45 L -35 -60 L 35 -60 L 35 -45 Z" fill="#e2e8f0" />
+                    <path d="M 35 -45 L 35 -60 L 55 -80 L 55 -65 Z" fill="#94a3b8" />
+                    <text x="0" y="120" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">ISOMETRIC</text>
+                </g>
+            `;
+            break;
+
+        case CameraPerspective.LOW_ANGLE:
+             // Hero Shot (Tube)
+             content = `
+                <rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" />
+                <g transform="translate(${cx}, ${cy})">
+                    <ellipse cx="0" cy="70" rx="35" ry="12" fill="#1e293b" stroke="${cCap}" stroke-width="2"/>
+                    <path d="M -35 70 L -35 45 L 35 45 L 35 70 Z" fill="${cCap}" />
+                    <path d="M -35 45 L -20 -50 L 20 -50 L 35 45 Z" fill="${cTube}" />
+                    <rect x="-20" y="-65" width="40" height="15" fill="#e2e8f0" />
+                    <path d="M -200 80 L 200 80 M -200 120 L 200 120" stroke="white" stroke-opacity="0.1" />
+                    <text x="0" y="120" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">LOW ANGLE</text>
+                </g>
+             `;
+            break;
+
+        case CameraPerspective.HIGH_ANGLE:
+             // Looking Down (Tube)
+             content = `
+                <rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" />
+                <g transform="translate(${cx}, ${cy})">
+                    <ellipse cx="0" cy="80" rx="15" ry="8" fill="${cCap}" opacity="0.5"/> 
+                    <path d="M -15 80 L -45 -20 L 45 -20 L 15 80 Z" fill="${cTube}" />
+                    <path d="M -45 -20 Q 0 -30 45 -20 L 45 -40 Q 0 -50 -45 -40 Z" fill="#e2e8f0" />
+                    <text x="0" y="120" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">HIGH ANGLE</text>
+                </g>
+             `;
+             break;
+             
+        case CameraPerspective.CLOSE_UP:
+             // Macro: Big Camera Icon
+             content = `
+                <rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" />
+                ${drawCamera(1.8)}
+                <text x="${cx}" y="${cy+130}" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">MACRO CLOSE-UP</text>
+             `;
+             break;
+
+        case CameraPerspective.WIDE_ANGLE:
+             // Wide Angle: Camera + Field of View Lines (from sketch)
+             content = `
+                <rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" />
+                <line x1="0" y1="0" x2="${cx-60}" y2="${cy-40}" stroke="white" stroke-width="3" />
+                <line x1="${w}" y1="0" x2="${cx+60}" y2="${cy-40}" stroke="white" stroke-width="3" />
+                <line x1="0" y1="${h}" x2="${cx-60}" y2="${cy+40}" stroke="white" stroke-width="3" />
+                <line x1="${w}" y1="${h}" x2="${cx+60}" y2="${cy+40}" stroke="white" stroke-width="3" />
+                ${drawCamera(1)}
+                <text x="${cx}" y="${cy+120}" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">WIDE ANGLE</text>
+             `;
+             break;
+
+        case CameraPerspective.DUTCH:
+             // Dutch: Tilted Camera Icon
+             content = `
+                <rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" />
+                ${drawCamera(1, -15)}
+                <text x="${cx}" y="${cy+120}" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">DUTCH ANGLE</text>
+             `;
+             break;
+
+        default:
+             // Generic Fallback
+             content = `
+                <rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" />
+                ${drawCamera(1)}
+                <text x="${cx}" y="${cy+80}" fill="white" text-anchor="middle" font-family="sans-serif">${angle}</text>
+             `;
+             break;
+    }
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">${content}</svg>`;
+    return `data:image/svg+xml;base64,${btoa(svg)}`;
+};
+
 const generateColorWheelPreview = (type: ColorTheory): string => {
   // SVG Configuration
   const width = 400; // Increased width for text labels
@@ -106,22 +433,17 @@ const generateColorWheelPreview = (type: ColorTheory): string => {
 
   switch (type) {
     case ColorTheory.TONE:
-      // Tone on Tone: Replaced with Cool/Warm diagram (Rotated Wheel + Text)
-      // Rotate 90deg so Red (Warm) is Right, Cyan (Cool) is Left
       rotation = 90; 
-      // Add Labels
       overlay += `<text x="40" y="${centerY}" fill="white" font-family="sans-serif" font-weight="bold" font-size="20" dominant-baseline="middle" text-anchor="start">COOL</text>`;
       overlay += `<text x="${width-40}" y="${centerY}" fill="white" font-family="sans-serif" font-weight="bold" font-size="20" dominant-baseline="middle" text-anchor="end">WARM</text>`;
       break;
 
     case ColorTheory.MONOCHROMATIC:
-       // Monochromatic: Green (Index 4 -> 120deg) + Shade Bar
        overlay += drawShadeBar(120);
        overlay += drawCircle(4);
       break;
 
     case ColorTheory.COMPLEMENTARY:
-      // 0 and 6
       const c1 = getCoords(0);
       const c2 = getCoords(6);
       overlay += `<line x1="${c1.x}" y1="${c1.y}" x2="${c2.x}" y2="${c2.y}" stroke="${strokeColor}" stroke-width="${strokeWidth}" />`;
@@ -130,7 +452,6 @@ const generateColorWheelPreview = (type: ColorTheory): string => {
       break;
 
     case ColorTheory.SPLIT_COMPLEMENTARY:
-      // 0, 5, 7
       const sc1 = getCoords(0);
       const sc2 = getCoords(5);
       const sc3 = getCoords(7);
@@ -141,10 +462,8 @@ const generateColorWheelPreview = (type: ColorTheory): string => {
       break;
 
     case ColorTheory.ANALOGOUS:
-      // 11, 0, 1
       const a1 = getCoords(11);
       const a2 = getCoords(1);
-      // Curve connecting them
       overlay += `<path d="M ${a1.x} ${a1.y} Q ${centerX} ${centerY-radius-20} ${a2.x} ${a2.y}" stroke="${strokeColor}" stroke-width="${strokeWidth}" fill="none" />`;
       overlay += drawCircle(11);
       overlay += drawCircle(0);
@@ -152,7 +471,6 @@ const generateColorWheelPreview = (type: ColorTheory): string => {
       break;
 
     case ColorTheory.TRIADIC:
-      // 0, 4, 8
       const t1 = getCoords(0);
       const t2 = getCoords(4);
       const t3 = getCoords(8);
@@ -163,7 +481,6 @@ const generateColorWheelPreview = (type: ColorTheory): string => {
       break;
 
     case ColorTheory.TETRADIC:
-      // 0, 3, 6, 9 (Square)
       const q1 = getCoords(0);
       const q2 = getCoords(3);
       const q3 = getCoords(6);
@@ -176,7 +493,6 @@ const generateColorWheelPreview = (type: ColorTheory): string => {
       break;
 
     default:
-        // Auto - Rainbow center
         overlay += `<circle cx="${centerX}" cy="${centerY}" r="${innerRadius-10}" fill="url(#rainbow)" opacity="0.3" />`;
         break;
   }
@@ -256,7 +572,6 @@ const App: React.FC = () => {
   // --- EFFECT: Match Reference Logic ---
   useEffect(() => {
     if (currentMode === AppMode.STUDIO && referenceTactic === ReferenceTactic.FULL && styleImages.length > 0) {
-        // Automatically suggest "Match Reference" if using full mimicry
         if (lighting !== LightingStyle.MATCH_REFERENCE) setLighting(LightingStyle.MATCH_REFERENCE);
         if (perspective !== CameraPerspective.MATCH_REFERENCE) setPerspective(CameraPerspective.MATCH_REFERENCE);
     }
@@ -266,31 +581,6 @@ const App: React.FC = () => {
 
   // --- DATA & PRELOADING ---
 
-  // Image URL Generators
-  
-  // STUDIO: Consistent Tube
-  const getTubePreview = (styleDetail: string) => {
-    const baseSubject = "minimalist white cosmetic cream tube standing on a beige rectangular block podium, solid beige background, 3d render style product photography";
-    return `https://image.pollinations.ai/prompt/${encodeURIComponent(`${baseSubject}, ${styleDetail}, high quality 8k`) }?width=600&height=450&nologo=true`;
-  };
-
-  // PORTRAIT: Consistent Woman (New)
-  const getPortraitPreview = (detail: string) => {
-    const baseSubject = "professional portrait photography of a confident young woman, looking at camera";
-    return `https://image.pollinations.ai/prompt/${encodeURIComponent(`${baseSubject}, ${detail}, high quality 8k, photorealistic`) }?width=600&height=450&nologo=true`;
-  };
-
-  // INTERIOR: Consistent Living Room (New)
-  const getInteriorPreview = (detail: string) => {
-    const baseSubject = "interior design photography of a spacious living room with large window";
-    return `https://image.pollinations.ai/prompt/${encodeURIComponent(`${baseSubject}, ${detail}, high quality 8k, photorealistic`) }?width=600&height=450&nologo=true`;
-  };
-
-  // Keep generic as fallback
-  const getPreview = (keyword: string) => `https://image.pollinations.ai/prompt/${encodeURIComponent(keyword + " high quality 8k photorealistic") }?width=600&height=450&nologo=true`;
-
-
-  // Specific Descriptions for Color Theory
   const colorTheoryDescriptions: Record<ColorTheory, string> = {
     [ColorTheory.AUTO]: 'AI automatically analyzes your product\'s color palette and selects the most harmonious background colors.',
     [ColorTheory.MONOCHROMATIC]: 'Uses variations in lightness and saturation of a single color. Clean, cohesive, and minimalist.',
@@ -303,109 +593,93 @@ const App: React.FC = () => {
   };
 
   // Memoized Helper Data (Single Source of Truth)
-  const helperData = useMemo(() => ({
-    LIGHTING: {
-        title: "Lighting Styles",
-        items: [
-            { label: 'Match Reference', desc: 'Analyzes your uploaded reference photo and copies its lighting exactly.', imageUrl: getTubePreview('digital scanning grid effect, analyzing reference, split screen') },
-            { label: 'Studio', desc: 'Even, controlled lighting. Minimal shadows. Perfect for e-commerce.', imageUrl: getTubePreview('soft bright even studio lighting, white softbox reflection') },
-            { label: 'Natural', desc: 'Mimics sunlight. Soft shadows. Good for lifestyle and organic products.', imageUrl: getTubePreview('natural hard sunlight, leaf shadows, organic feel') },
-            { label: 'Cinematic', desc: 'High contrast, dramatic shadows, moody atmosphere. Adds mystery.', imageUrl: getTubePreview('dramatic cinematic lighting, low key, dark shadows, mystery') },
-            { label: 'Neon', desc: 'Cyberpunk style with colored rim lights (Blue/Pink). Tech & Gaming.', imageUrl: getTubePreview('cyberpunk neon blue and pink rim lighting, dark background') },
-            { label: 'Minimalist', desc: 'Very soft, diffused light. High-key white/grey background feel.', imageUrl: getTubePreview('minimalist high key lighting, very soft white diffusion, ethereal') },
-            { label: 'Product Boost', desc: 'Punchy, high key lighting designed specifically to make colors pop.', imageUrl: getTubePreview('vibrant commercial lighting, high saturation, sharp details') }
-        ]
-    },
-    ANGLE: {
-        title: "Camera Angles",
-        items: [
-            { label: 'Match Reference', desc: 'Mimics the exact camera position of your reference photo.', imageUrl: getTubePreview('digital viewfinder overlay, analyzing perspective') },
-            { label: 'Front', desc: 'Directly facing the subject. Standard listing shot.', imageUrl: getTubePreview('straight front view, eye level, symmetrical') },
-            { label: 'Isometric', desc: '3/4 view from above. Gives a 3D technical feel.', imageUrl: getTubePreview('isometric view, 3/4 angle from above, 3d technical look') },
-            { label: 'Flat Lay', desc: 'Directly from above (90 degrees). Good for collections and kits.', imageUrl: getTubePreview('flat lay, top down view directly above, 90 degrees') },
-            { label: 'Low Angle', desc: 'Camera looks up at product. Makes it look heroic/large.', imageUrl: getTubePreview('worm eye view, low angle looking up, heroic scale') },
-            { label: 'High Angle', desc: 'Looking down slightly. Good for showing depth and dimension.', imageUrl: getTubePreview('high angle looking down 45 degrees, depth') },
-            { label: 'Close Up', desc: 'Macro shot focusing on texture and details.', imageUrl: getTubePreview('extreme macro close up, focus on cap texture and details') },
-            { label: 'Dutch Angle', desc: 'Tilted camera for a dynamic, edgy, and energetic look.', imageUrl: getTubePreview('dutch angle, tilted camera frame, dynamic diagonal') }
-        ]
-    },
-    COLOR_THEORY: {
-        title: "Color Theory",
-        items: Object.values(ColorTheory).map(c => ({
-            label: c, 
-            desc: colorTheoryDescriptions[c as ColorTheory],
-            imageUrl: generateColorWheelPreview(c as ColorTheory) // Using custom generator
-        }))
-    },
-    PORTRAIT_ENV: {
-        title: "Portrait Environment",
-        items: [
-            { label: 'Modern Office', desc: 'Clean, professional workspace background with soft depth of field.', imageUrl: getPortraitPreview('modern corporate office interior background, blurred bokeh') },
-            { label: 'Cozy Cafe', desc: 'Warm, ambient lighting with blurred coffee shop details. Casual & inviting.', imageUrl: getPortraitPreview('cozy coffee shop interior warm lighting background, blurred bokeh') },
-            { label: 'Nature', desc: 'Natural outdoor setting with greenery and dappled sunlight.', imageUrl: getPortraitPreview('outdoor nature park background with green trees, blurred bokeh') },
-            { label: 'Urban Street', desc: 'City streets, concrete textures, and dynamic urban energy.', imageUrl: getPortraitPreview('urban city street background, busy, blurred bokeh') },
-            { label: 'Studio Grey', desc: 'Classic neutral grey backdrop for pure focus on the subject.', imageUrl: getPortraitPreview('professional studio photography grey seamless backdrop') },
-            { label: 'Luxury Hotel', desc: 'High-end lobby aesthetic with warm lights, wood, and rich textures.', imageUrl: getPortraitPreview('luxury hotel lobby interior background, gold and wood, blurred bokeh') },
-            { label: 'Sunset Beach', desc: 'Bright, airy coastal vibe with warm sand and sky tones.', imageUrl: getPortraitPreview('sunset beach coastal background, golden hour, blurred bokeh') }
-        ]
-    },
-    PORTRAIT_VIBE: {
-        title: "Vibe & Lighting",
-        items: [
-            { label: 'Professional', desc: 'Even, flattering lighting suitable for LinkedIn, CVs, and Corporate.', imageUrl: getPortraitPreview('professional headshot lighting, clean sharp focus, neutral expression') },
-            { label: 'Candid & Soft', desc: 'Soft, natural light that feels unposed, authentic and friendly.', imageUrl: getPortraitPreview('soft natural light portrait photography, candid moment, slight smile, authentic') },
-            { label: 'Dramatic', desc: 'High contrast shadows and highlights for a moody, artistic look.', imageUrl: getPortraitPreview('dramatic portrait lighting, chiaroscuro, high contrast, moody shadow') },
-            { label: 'Golden Hour', desc: 'Warm, orange-hued lighting simulating sunset. Very flattering.', imageUrl: getPortraitPreview('golden hour sunset lighting portrait photography, warm orange glow, lens flare') },
-            { label: 'Black & White', desc: 'Artistic monochromatic processing with strong contrast and timeless feel.', imageUrl: getPortraitPreview('black and white artistic portrait photography, high contrast, monochrome') }
-        ]
-    },
-    INTERIOR_STYLE: {
-        title: "Design Style",
-        items: [
-            { label: 'Minimalist', desc: 'Clean lines, decluttered spaces, and monochromatic palettes.', imageUrl: getInteriorPreview('minimalist interior design, white walls, clean lines, decluttered, zen') },
-            { label: 'Industrial', desc: 'Raw elements like exposed brick, metal, and concrete. Loft vibes.', imageUrl: getInteriorPreview('industrial loft interior design, exposed brick walls, concrete floor, black metal accents') },
-            { label: 'Scandinavian', desc: 'Bright, airy, functional with warm wood and white tones. Japandi.', imageUrl: getInteriorPreview('scandinavian interior design, bright, warm light wood, white walls, hygge, japandi') },
-            { label: 'Mid-Century', desc: 'Retro aesthetic with organic curves, teak wood, and olive greens.', imageUrl: getInteriorPreview('mid century modern living room interior design, teak furniture, retro aesthetic, olive green') },
-            { label: 'Bohemian', desc: 'Eclectic, layered textures, plants, rugs, and relaxed vibes.', imageUrl: getInteriorPreview('bohemian interior design, many plants, layered rugs, eclectic textures, relaxed') },
-            { label: 'Luxury Classic', desc: 'Ornate details, moldings, chandeliers, and sophisticated elegance.', imageUrl: getInteriorPreview('luxury classic interior design, chandelier, wall molding, sophisticated elegance, expensive') },
-            { label: 'Cyberpunk', desc: 'Neon lights, dark tones, and futuristic tech elements.', imageUrl: getInteriorPreview('cyberpunk interior room, neon blue and pink lights, futuristic tech, dark atmosphere') }
-        ]
-    },
-    INTERIOR_MATERIAL: {
-        title: "Materials & Finishes",
-        items: [
-            { label: 'Wood & White', desc: 'Warm oak or walnut paired with crisp white surfaces.', imageUrl: getInteriorPreview('interior featuring warm oak wood furniture and crisp white walls texture') },
-            { label: 'Concrete & Metal', desc: 'Urban, raw textures using grey concrete and black steel.', imageUrl: getInteriorPreview('interior featuring raw grey concrete walls and black steel furniture texture') },
-            { label: 'Velvet & Gold', desc: 'Soft, plush fabrics accented with metallic gold finishes.', imageUrl: getInteriorPreview('interior featuring plush velvet furniture and metallic gold accents texture') },
-            { label: 'Earth Tones', desc: 'Beige, terracotta, linen, and olive greens for a grounded feel.', imageUrl: getInteriorPreview('interior featuring earth tones, beige, terracotta, linen fabric, olive green') },
-            { label: 'Marble & Glass', desc: 'Sleek, reflective surfaces denoting high-end luxury.', imageUrl: getInteriorPreview('interior featuring white marble floors and glass surfaces, high end luxury') },
-            { label: 'Vibrant', desc: 'Bold, vibrant color combinations for a playful and energetic look.', imageUrl: getInteriorPreview('interior featuring vibrant colorful furniture, bold patterns, energetic colors') }
-        ]
-    }
-  }), []);
-
-  // Preload Images Effect
-  useEffect(() => {
-    // Determine which categories to preload based on mode
-    const categoriesToPreload: (keyof typeof helperData)[] = [];
+  const helperData = useMemo(() => {
     
-    if (currentMode === AppMode.STUDIO) {
-        categoriesToPreload.push('LIGHTING', 'ANGLE', 'COLOR_THEORY');
-    } else if (currentMode === AppMode.PORTRAIT) {
-        categoriesToPreload.push('PORTRAIT_ENV', 'PORTRAIT_VIBE');
-    } else if (currentMode === AppMode.INTERIOR) {
-        categoriesToPreload.push('INTERIOR_STYLE', 'INTERIOR_MATERIAL');
-    }
+    // Stable Unsplash URLs
+    const getUnsplash = (id: string) => `https://images.unsplash.com/photo-${id}?w=400&h=300&fit=crop&q=80`;
 
-    // Iterate and preload
-    categoriesToPreload.forEach(cat => {
-        helperData[cat].items.forEach(item => {
-            if (item.imageUrl) {
-                const img = new Image();
-                img.src = item.imageUrl;
-            }
-        });
-    });
+    return {
+        LIGHTING: {
+            title: "Lighting Styles",
+            items: Object.values(LightingStyle).map(style => ({
+                label: style,
+                desc: style.toString(), // Simplified desc for now, usually mapped elsewhere
+                imageUrl: generateLightingPreview(style) // INSTANT SVG
+            }))
+        },
+        ANGLE: {
+            title: "Camera Angles",
+            items: Object.values(CameraPerspective).map(angle => ({
+                label: angle,
+                desc: angle.toString(),
+                imageUrl: generateAnglePreview(angle) // INSTANT SVG
+            }))
+        },
+        COLOR_THEORY: {
+            title: "Color Theory",
+            items: Object.values(ColorTheory).map(c => ({
+                label: c, 
+                desc: colorTheoryDescriptions[c as ColorTheory],
+                imageUrl: generateColorWheelPreview(c as ColorTheory) // INSTANT SVG
+            }))
+        },
+        PORTRAIT_ENV: {
+            title: "Portrait Environment",
+            items: [
+                { label: 'Modern Office', desc: 'Clean, professional workspace background with soft depth of field.', imageUrl: getUnsplash('1497366216548-37526070297c') },
+                { label: 'Cozy Cafe', desc: 'Warm, ambient lighting with blurred coffee shop details. Casual & inviting.', imageUrl: getUnsplash('1559925393-8be033611a8f') },
+                { label: 'Nature', desc: 'Natural outdoor setting with greenery and dappled sunlight.', imageUrl: getUnsplash('1441974231531-c6227db76b6e') },
+                { label: 'Urban Street', desc: 'City streets, concrete textures, and dynamic urban energy.', imageUrl: getUnsplash('1449824913935-59a10b8d2000') },
+                { label: 'Studio Grey', desc: 'Classic neutral grey backdrop for pure focus on the subject.', imageUrl: getUnsplash('1519389950476-29a8e752cc80') },
+                { label: 'Luxury Hotel', desc: 'High-end lobby aesthetic with warm lights, wood, and rich textures.', imageUrl: getUnsplash('1566073771259-6a8506099945') },
+                { label: 'Sunset Beach', desc: 'Bright, airy coastal vibe with warm sand and sky tones.', imageUrl: getUnsplash('1507525428034-b723cf961d3e') }
+            ]
+        },
+        PORTRAIT_VIBE: {
+            title: "Vibe & Lighting",
+            items: [
+                { label: 'Professional', desc: 'Even, flattering lighting suitable for LinkedIn, CVs, and Corporate.', imageUrl: getUnsplash('1560250097-0b93528c311a') },
+                { label: 'Candid & Soft', desc: 'Soft, natural light that feels unposed, authentic and friendly.', imageUrl: getUnsplash('1438761681033-6461ffad8d80') },
+                { label: 'Dramatic', desc: 'High contrast shadows and highlights for a moody, artistic look.', imageUrl: getUnsplash('1534528741775-53994a69daeb') },
+                { label: 'Golden Hour', desc: 'Warm, orange-hued lighting simulating sunset. Very flattering.', imageUrl: getUnsplash('1495745966610-2a67f2297e5e') },
+                { label: 'Black & White', desc: 'Artistic monochromatic processing with strong contrast and timeless feel.', imageUrl: getUnsplash('1570295999919-56ceb5ecca61') }
+            ]
+        },
+        INTERIOR_STYLE: {
+            title: "Design Style",
+            items: [
+                { label: 'Minimalist', desc: 'Clean lines, decluttered spaces, and monochromatic palettes.', imageUrl: getUnsplash('1494438639946-1ebd1d20bf85') },
+                { label: 'Industrial', desc: 'Raw elements like exposed brick, metal, and concrete. Loft vibes.', imageUrl: getUnsplash('1534349767944-1e244d23050d') },
+                { label: 'Scandinavian', desc: 'Bright, airy, functional with warm wood and white tones. Japandi.', imageUrl: getUnsplash('1598928506311-c55ded91a20c') },
+                { label: 'Mid-Century', desc: 'Retro aesthetic with organic curves, teak wood, and olive greens.', imageUrl: getUnsplash('1556228453-efd6c1ff04f6') },
+                { label: 'Bohemian', desc: 'Eclectic, layered textures, plants, rugs, and relaxed vibes.', imageUrl: getUnsplash('1522771753033-6a3169f97771') },
+                { label: 'Luxury Classic', desc: 'Ornate details, moldings, chandeliers, and sophisticated elegance.', imageUrl: getUnsplash('1600210492486-724fe5c67fb0') },
+                { label: 'Cyberpunk', desc: 'Neon lights, dark tones, and futuristic tech elements.', imageUrl: getUnsplash('1515630267439-d943069c6930') }
+            ]
+        },
+        INTERIOR_MATERIAL: {
+            title: "Materials & Finishes",
+            items: [
+                { label: 'Wood & White', desc: 'Warm oak or walnut paired with crisp white surfaces.', imageUrl: getUnsplash('1513694203232-719a280e022f') },
+                { label: 'Concrete & Metal', desc: 'Urban, raw textures using grey concrete and black steel.', imageUrl: getUnsplash('1517581177699-33ef28a37f1e') },
+                { label: 'Velvet & Gold', desc: 'Soft, plush fabrics accented with metallic gold finishes.', imageUrl: getUnsplash('1505691938271-96e605687858') },
+                { label: 'Earth Tones', desc: 'Beige, terracotta, linen, and olive greens for a grounded feel.', imageUrl: getUnsplash('1502005229766-31bf63baa546') },
+                { label: 'Marble & Glass', desc: 'Sleek, reflective surfaces denoting high-end luxury.', imageUrl: getUnsplash('1564013799919-ab600027ffc6') },
+                { label: 'Vibrant', desc: 'Bold, vibrant color combinations for a playful and energetic look.', imageUrl: getUnsplash('1530018607912-eff2daa1bac4') }
+            ]
+        }
+    };
+  }, []);
+
+  // Preload Images Effect (Only for external URLs)
+  useEffect(() => {
+    if (currentMode === AppMode.PORTRAIT) {
+        helperData.PORTRAIT_ENV.items.forEach(i => i.imageUrl && (new Image().src = i.imageUrl));
+        helperData.PORTRAIT_VIBE.items.forEach(i => i.imageUrl && (new Image().src = i.imageUrl));
+    } else if (currentMode === AppMode.INTERIOR) {
+        helperData.INTERIOR_STYLE.items.forEach(i => i.imageUrl && (new Image().src = i.imageUrl));
+        helperData.INTERIOR_MATERIAL.items.forEach(i => i.imageUrl && (new Image().src = i.imageUrl));
+    }
   }, [currentMode, helperData]);
 
   // --- ACTIONS ---
@@ -725,73 +999,37 @@ const App: React.FC = () => {
 
                         {/* STUDIO CONTROLS */}
                         {currentMode === AppMode.STUDIO && (
-                            <>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <Select 
-                                    label="Lighting" 
-                                    options={Object.values(LightingStyle).map(v => ({value:v, label:v}))} 
-                                    value={lighting} 
-                                    onChange={(e) => setLighting(e.target.value as LightingStyle)} 
-                                    onHelp={() => setActiveHelper('LIGHTING')}
-                                />
-                                <Select 
-                                    label="Camera Angle" 
-                                    options={Object.values(CameraPerspective).map(v => ({value:v, label:v}))} 
-                                    value={perspective} 
-                                    onChange={(e) => setPerspective(e.target.value as CameraPerspective)} 
-                                    onHelp={() => setActiveHelper('ANGLE')}
-                                />
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <Select 
-                                    label="Color Theory" 
-                                    options={Object.values(ColorTheory).map(v => ({value:v, label:v}))} 
-                                    value={colorTheory} 
-                                    onChange={(e) => setColorTheory(e.target.value as ColorTheory)}
-                                    onHelp={() => setActiveHelper('COLOR_THEORY')}
-                                />
-                            </div>
-                            </>
+                            <StudioPanel
+                                lighting={lighting}
+                                setLighting={setLighting}
+                                perspective={perspective}
+                                setPerspective={setPerspective}
+                                colorTheory={colorTheory}
+                                setColorTheory={setColorTheory}
+                                onShowHelper={setActiveHelper}
+                            />
                         )}
 
                         {/* PORTRAIT CONTROLS */}
                         {currentMode === AppMode.PORTRAIT && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <Select 
-                                    label="Environment" 
-                                    options={Object.values(PortraitEnvironment).map(v => ({value:v, label:v}))} 
-                                    value={portraitEnv} 
-                                    onChange={(e) => setPortraitEnv(e.target.value as PortraitEnvironment)} 
-                                    onHelp={() => setActiveHelper('PORTRAIT_ENV')}
-                                />
-                                <Select 
-                                    label="Vibe & Lighting" 
-                                    options={Object.values(PortraitVibe).map(v => ({value:v, label:v}))} 
-                                    value={portraitVibe} 
-                                    onChange={(e) => setPortraitVibe(e.target.value as PortraitVibe)} 
-                                    onHelp={() => setActiveHelper('PORTRAIT_VIBE')}
-                                />
-                            </div>
+                           <PortraitPanel 
+                                env={portraitEnv}
+                                setEnv={setPortraitEnv}
+                                vibe={portraitVibe}
+                                setVibe={setPortraitVibe}
+                                onShowHelper={setActiveHelper}
+                           />
                         )}
 
                         {/* INTERIOR CONTROLS */}
                         {currentMode === AppMode.INTERIOR && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <Select 
-                                    label="Design Style" 
-                                    options={Object.values(InteriorStyle).map(v => ({value:v, label:v}))} 
-                                    value={interiorStyle} 
-                                    onChange={(e) => setInteriorStyle(e.target.value as InteriorStyle)} 
-                                    onHelp={() => setActiveHelper('INTERIOR_STYLE')}
-                                />
-                                <Select 
-                                    label="Materials" 
-                                    options={Object.values(InteriorMaterial).map(v => ({value:v, label:v}))} 
-                                    value={interiorMaterial} 
-                                    onChange={(e) => setInteriorMaterial(e.target.value as InteriorMaterial)} 
-                                    onHelp={() => setActiveHelper('INTERIOR_MATERIAL')}
-                                />
-                            </div>
+                           <InteriorPanel 
+                                style={interiorStyle}
+                                setStyle={setInteriorStyle}
+                                material={interiorMaterial}
+                                setMaterial={setInteriorMaterial}
+                                onShowHelper={setActiveHelper}
+                           />
                         )}
                     </div>
                 </section>

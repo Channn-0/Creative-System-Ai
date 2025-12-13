@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { X, Info, Maximize2 } from 'lucide-react';
+import { X, Info, Maximize2, ImageOff } from 'lucide-react';
 
 interface VisualHelperProps {
   title: string;
@@ -9,6 +8,60 @@ interface VisualHelperProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+interface VisualHelperCardProps {
+  item: { label: string; desc: string; imageUrl?: string };
+  onClick: (data: { url: string; label: string }) => void;
+}
+
+// Sub-component to handle individual card state (loading/error)
+const VisualHelperCard: React.FC<VisualHelperCardProps> = ({ 
+    item, 
+    onClick 
+}) => {
+    const [imgError, setImgError] = useState(false);
+
+    return (
+        <div 
+            className="group flex flex-col h-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 hover:border-brand-400 dark:hover:border-brand-400 transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1"
+        >
+            {/* Hero Area */}
+            <div 
+                className="w-full aspect-[4/3] rounded-xl bg-slate-100 dark:bg-slate-900 flex items-center justify-center relative overflow-hidden text-center mb-4 cursor-pointer ring-1 ring-slate-200 dark:ring-slate-800 group-hover:ring-brand-400/50 transition-all p-6"
+                onClick={() => !imgError && item.imageUrl && onClick({ url: item.imageUrl, label: item.label })}
+            >
+                {!imgError && item.imageUrl ? (
+                <>
+                    <img 
+                        src={item.imageUrl} 
+                        alt={item.label} 
+                        className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-110 drop-shadow-xl" 
+                        loading="lazy"
+                        onError={() => setImgError(true)}
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                        <Maximize2 className="text-slate-900 dark:text-white drop-shadow-md transform scale-75 group-hover:scale-100 transition-transform" size={32} />
+                    </div>
+                </>
+                ) : (
+                // Fallback Text if image fails
+                <div className="flex flex-col items-center gap-2">
+                    <span className="text-slate-400 font-bold text-xl md:text-2xl leading-tight select-none px-4">
+                        {item.label}
+                    </span>
+                    {imgError && <span className="text-[10px] text-slate-400 uppercase tracking-widest flex items-center gap-1"><ImageOff size={12}/> Preview Unavailable</span>}
+                </div>
+                )}
+            </div>
+
+            {/* Text Area */}
+            <div className="mt-auto px-1">
+                <h4 className="text-base font-bold text-slate-900 dark:text-white mb-1.5">{item.label}</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{item.desc}</p>
+            </div>
+        </div>
+    );
+};
 
 export const VisualHelper: React.FC<VisualHelperProps> = ({ 
   title, 
@@ -49,41 +102,11 @@ export const VisualHelper: React.FC<VisualHelperProps> = ({
         <div className="p-4 md:p-6 overflow-y-auto custom-scrollbar flex-1 bg-slate-50 dark:bg-slate-950">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {items.map((item, idx) => (
-              <div 
-                key={idx} 
-                className="group flex flex-col h-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 hover:border-brand-400 dark:hover:border-brand-400 transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1"
-              >
-                {/* Hero Area (Image or Text Box) */}
-                <div 
-                  className="w-full aspect-[4/3] rounded-xl bg-slate-100 dark:bg-slate-900 flex items-center justify-center relative overflow-hidden text-center mb-4 cursor-pointer ring-1 ring-slate-200 dark:ring-slate-800 group-hover:ring-brand-400/50 transition-all p-6"
-                  onClick={() => item.imageUrl && setZoomedImage({ url: item.imageUrl, label: item.label })}
-                >
-                  {item.imageUrl ? (
-                    <>
-                      <img 
-                        src={item.imageUrl} 
-                        alt={item.label} 
-                        className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-110 drop-shadow-xl" 
-                        loading="lazy"
-                      />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                        <Maximize2 className="text-slate-900 dark:text-white drop-shadow-md transform scale-75 group-hover:scale-100 transition-transform" size={32} />
-                      </div>
-                    </>
-                  ) : (
-                    // Fallback Text if image fails or not provided
-                    <span className="text-slate-400 font-bold text-xl md:text-2xl leading-tight select-none px-4">
-                      {item.label}
-                    </span>
-                  )}
-                </div>
-
-                {/* Text Area */}
-                <div className="mt-auto px-1">
-                  <h4 className="text-base font-bold text-slate-900 dark:text-white mb-1.5">{item.label}</h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{item.desc}</p>
-                </div>
-              </div>
+                <VisualHelperCard 
+                    key={idx} 
+                    item={item} 
+                    onClick={setZoomedImage} 
+                />
             ))}
           </div>
         </div>
