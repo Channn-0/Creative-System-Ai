@@ -20,6 +20,187 @@ import {
 import { generateOptimizedPrompt, generateImage } from './services/gemini';
 import { downloadImage } from './utils';
 
+// --- COLOR WHEEL SVG GENERATOR ---
+const generateColorWheelPreview = (type: ColorTheory): string => {
+  // SVG Configuration
+  const width = 400; // Increased width for text labels
+  const height = 380; 
+  const centerX = width / 2;
+  const centerY = 150; // Keep wheel at top
+  const radius = 120;
+  const innerRadius = 70;
+  
+  // Stroke is white as requested
+  const strokeColor = "#ffffff"; 
+  const strokeWidth = 5;
+  
+  // 12 Color Segments (HSL)
+  const segments = Array.from({ length: 12 }, (_, i) => {
+    const startAngle = (i * 30) - 15; // Offset to center top segment
+    const endAngle = startAngle + 30;
+    
+    // Convert polar to cartesian
+    const toRad = (deg: number) => (deg - 90) * Math.PI / 180;
+    
+    const x1 = centerX + radius * Math.cos(toRad(startAngle));
+    const y1 = centerY + radius * Math.sin(toRad(startAngle));
+    const x2 = centerX + radius * Math.cos(toRad(endAngle));
+    const y2 = centerY + radius * Math.sin(toRad(endAngle));
+    
+    const x3 = centerX + innerRadius * Math.cos(toRad(endAngle));
+    const y3 = centerY + innerRadius * Math.sin(toRad(endAngle));
+    const x4 = centerX + innerRadius * Math.cos(toRad(startAngle));
+    const y4 = centerY + innerRadius * Math.sin(toRad(startAngle));
+
+    const pathData = `
+      M ${x1} ${y1}
+      A ${radius} ${radius} 0 0 1 ${x2} ${y2}
+      L ${x3} ${y3}
+      A ${innerRadius} ${innerRadius} 0 0 0 ${x4} ${y4}
+      Z
+    `;
+    
+    // HSL Color: Start from Red (0) at top (index 0)
+    const hue = i * 30;
+    const color = `hsl(${hue}, 85%, 60%)`;
+    
+    return { path: pathData, color, index: i };
+  });
+
+  // Helper to draw connection lines/shapes
+  const getCoords = (index: number, r: number = innerRadius + (radius - innerRadius)/2) => {
+    const angle = (index * 30);
+    const rad = (angle - 90) * Math.PI / 180;
+    return {
+      x: centerX + r * Math.cos(rad),
+      y: centerY + r * Math.sin(rad)
+    };
+  };
+
+  const drawCircle = (index: number) => {
+    const { x, y } = getCoords(index);
+    return `<circle cx="${x}" cy="${y}" r="14" fill="transparent" stroke="${strokeColor}" stroke-width="${strokeWidth}" />`;
+  };
+
+  // Helper for the bottom shade bar
+  const drawShadeBar = (hue: number) => {
+      const barWidth = 240;
+      const barHeight = 40;
+      const startX = (width - barWidth) / 2;
+      const startY = 300;
+      const blocks = 7;
+      const blockWidth = barWidth / blocks;
+      
+      let rects = '';
+      for(let i=0; i<blocks; i++) {
+        // Lightness from 40% to 90%
+        const l = 40 + (i * (55 / (blocks-1))); 
+        const color = `hsl(${hue}, 85%, ${l}%)`;
+        rects += `<rect x="${startX + i*blockWidth}" y="${startY}" width="${blockWidth}" height="${barHeight}" fill="${color}" stroke="white" stroke-width="1" />`;
+      }
+      return `<g>${rects}</g>`;
+  };
+
+  let overlay = '';
+  let rotation = 0;
+
+  switch (type) {
+    case ColorTheory.TONE:
+      // Tone on Tone: Replaced with Cool/Warm diagram (Rotated Wheel + Text)
+      // Rotate 90deg so Red (Warm) is Right, Cyan (Cool) is Left
+      rotation = 90; 
+      // Add Labels
+      overlay += `<text x="40" y="${centerY}" fill="white" font-family="sans-serif" font-weight="bold" font-size="20" dominant-baseline="middle" text-anchor="start">COOL</text>`;
+      overlay += `<text x="${width-40}" y="${centerY}" fill="white" font-family="sans-serif" font-weight="bold" font-size="20" dominant-baseline="middle" text-anchor="end">WARM</text>`;
+      break;
+
+    case ColorTheory.MONOCHROMATIC:
+       // Monochromatic: Green (Index 4 -> 120deg) + Shade Bar
+       overlay += drawShadeBar(120);
+       overlay += drawCircle(4);
+      break;
+
+    case ColorTheory.COMPLEMENTARY:
+      // 0 and 6
+      const c1 = getCoords(0);
+      const c2 = getCoords(6);
+      overlay += `<line x1="${c1.x}" y1="${c1.y}" x2="${c2.x}" y2="${c2.y}" stroke="${strokeColor}" stroke-width="${strokeWidth}" />`;
+      overlay += drawCircle(0);
+      overlay += drawCircle(6);
+      break;
+
+    case ColorTheory.SPLIT_COMPLEMENTARY:
+      // 0, 5, 7
+      const sc1 = getCoords(0);
+      const sc2 = getCoords(5);
+      const sc3 = getCoords(7);
+      overlay += `<path d="M ${sc1.x} ${sc1.y} L ${centerX} ${centerY} L ${sc2.x} ${sc2.y} M ${centerX} ${centerY} L ${sc3.x} ${sc3.y}" stroke="${strokeColor}" stroke-width="${strokeWidth}" fill="none" />`;
+      overlay += drawCircle(0);
+      overlay += drawCircle(5);
+      overlay += drawCircle(7);
+      break;
+
+    case ColorTheory.ANALOGOUS:
+      // 11, 0, 1
+      const a1 = getCoords(11);
+      const a2 = getCoords(1);
+      // Curve connecting them
+      overlay += `<path d="M ${a1.x} ${a1.y} Q ${centerX} ${centerY-radius-20} ${a2.x} ${a2.y}" stroke="${strokeColor}" stroke-width="${strokeWidth}" fill="none" />`;
+      overlay += drawCircle(11);
+      overlay += drawCircle(0);
+      overlay += drawCircle(1);
+      break;
+
+    case ColorTheory.TRIADIC:
+      // 0, 4, 8
+      const t1 = getCoords(0);
+      const t2 = getCoords(4);
+      const t3 = getCoords(8);
+      overlay += `<polygon points="${t1.x},${t1.y} ${t2.x},${t2.y} ${t3.x},${t3.y}" fill="none" stroke="${strokeColor}" stroke-width="${strokeWidth}" />`;
+      overlay += drawCircle(0);
+      overlay += drawCircle(4);
+      overlay += drawCircle(8);
+      break;
+
+    case ColorTheory.TETRADIC:
+      // 0, 3, 6, 9 (Square)
+      const q1 = getCoords(0);
+      const q2 = getCoords(3);
+      const q3 = getCoords(6);
+      const q4 = getCoords(9);
+      overlay += `<polygon points="${q1.x},${q1.y} ${q2.x},${q2.y} ${q3.x},${q3.y} ${q4.x},${q4.y}" fill="none" stroke="${strokeColor}" stroke-width="${strokeWidth}" />`;
+      overlay += drawCircle(0);
+      overlay += drawCircle(3);
+      overlay += drawCircle(6);
+      overlay += drawCircle(9);
+      break;
+
+    default:
+        // Auto - Rainbow center
+        overlay += `<circle cx="${centerX}" cy="${centerY}" r="${innerRadius-10}" fill="url(#rainbow)" opacity="0.3" />`;
+        break;
+  }
+
+  const svgString = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}">
+      <defs>
+        <linearGradient id="rainbow" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ff0000" />
+            <stop offset="100%" stop-color="#0000ff" />
+        </linearGradient>
+      </defs>
+      <g transform="rotate(${rotation} ${centerX} ${centerY})">
+        ${segments.map(s => `<path d="${s.path}" fill="${s.color}" stroke="white" stroke-width="2" />`).join('')}
+      </g>
+      <g>
+        ${overlay}
+      </g>
+    </svg>
+  `;
+  
+  return `data:image/svg+xml;base64,${btoa(svgString)}`;
+};
+
 const App: React.FC = () => {
   // --- STATE ---
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -86,10 +267,39 @@ const App: React.FC = () => {
   // --- DATA & PRELOADING ---
 
   // Image URL Generators
-  const getPreview = (keyword: string) => `https://image.pollinations.ai/prompt/${encodeURIComponent(keyword + " high quality 8k photorealistic") }?width=600&height=450&nologo=true`;
+  
+  // STUDIO: Consistent Tube
   const getTubePreview = (styleDetail: string) => {
     const baseSubject = "minimalist white cosmetic cream tube standing on a beige rectangular block podium, solid beige background, 3d render style product photography";
     return `https://image.pollinations.ai/prompt/${encodeURIComponent(`${baseSubject}, ${styleDetail}, high quality 8k`) }?width=600&height=450&nologo=true`;
+  };
+
+  // PORTRAIT: Consistent Woman (New)
+  const getPortraitPreview = (detail: string) => {
+    const baseSubject = "professional portrait photography of a confident young woman, looking at camera";
+    return `https://image.pollinations.ai/prompt/${encodeURIComponent(`${baseSubject}, ${detail}, high quality 8k, photorealistic`) }?width=600&height=450&nologo=true`;
+  };
+
+  // INTERIOR: Consistent Living Room (New)
+  const getInteriorPreview = (detail: string) => {
+    const baseSubject = "interior design photography of a spacious living room with large window";
+    return `https://image.pollinations.ai/prompt/${encodeURIComponent(`${baseSubject}, ${detail}, high quality 8k, photorealistic`) }?width=600&height=450&nologo=true`;
+  };
+
+  // Keep generic as fallback
+  const getPreview = (keyword: string) => `https://image.pollinations.ai/prompt/${encodeURIComponent(keyword + " high quality 8k photorealistic") }?width=600&height=450&nologo=true`;
+
+
+  // Specific Descriptions for Color Theory
+  const colorTheoryDescriptions: Record<ColorTheory, string> = {
+    [ColorTheory.AUTO]: 'AI automatically analyzes your product\'s color palette and selects the most harmonious background colors.',
+    [ColorTheory.MONOCHROMATIC]: 'Uses variations in lightness and saturation of a single color. Clean, cohesive, and minimalist.',
+    [ColorTheory.TONE]: 'Uses distinct color temperatures (Warm vs Cool) to set the mood of the image.',
+    [ColorTheory.COMPLEMENTARY]: 'Pairs colors from opposite sides of the wheel (e.g., Blue & Orange). High contrast and vibrant.',
+    [ColorTheory.SPLIT_COMPLEMENTARY]: 'Uses a base color plus the two colors adjacent to its complement. High contrast but less tension.',
+    [ColorTheory.ANALOGOUS]: 'Uses colors that are next to each other on the wheel. Harmonious and pleasing to the eye.',
+    [ColorTheory.TRIADIC]: 'Uses three colors evenly spaced around the wheel. Offers high contrast while retaining harmony.',
+    [ColorTheory.TETRADIC]: 'Uses four colors arranged into two complementary pairs. Rich, complex, and colorful.'
   };
 
   // Memoized Helper Data (Single Source of Truth)
@@ -123,53 +333,53 @@ const App: React.FC = () => {
         title: "Color Theory",
         items: Object.values(ColorTheory).map(c => ({
             label: c, 
-            desc: c === ColorTheory.AUTO ? 'AI analyzes product color and selects best matching background.' : 'Applies standard artistic color wheel rules to harmony.',
-            imageUrl: getPreview(`color palette ${c} artistic design composition`)
+            desc: colorTheoryDescriptions[c as ColorTheory],
+            imageUrl: generateColorWheelPreview(c as ColorTheory) // Using custom generator
         }))
     },
     PORTRAIT_ENV: {
         title: "Portrait Environment",
         items: [
-            { label: 'Modern Office', desc: 'Clean, professional workspace background with soft depth of field.', imageUrl: getPreview('modern corporate office interior blurred background') },
-            { label: 'Cozy Cafe', desc: 'Warm, ambient lighting with blurred coffee shop details. Casual & inviting.', imageUrl: getPreview('cozy coffee shop interior warm lighting blurred') },
-            { label: 'Nature', desc: 'Natural outdoor setting with greenery and dappled sunlight.', imageUrl: getPreview('outdoor nature park blurred background bokeh green') },
-            { label: 'Urban Street', desc: 'City streets, concrete textures, and dynamic urban energy.', imageUrl: getPreview('urban city street background blurred depth of field') },
-            { label: 'Studio Grey', desc: 'Classic neutral grey backdrop for pure focus on the subject.', imageUrl: getPreview('studio photography grey backdrop seamless') },
-            { label: 'Luxury Hotel', desc: 'High-end lobby aesthetic with warm lights, wood, and rich textures.', imageUrl: getPreview('luxury hotel lobby interior blurred background') },
-            { label: 'Sunset Beach', desc: 'Bright, airy coastal vibe with warm sand and sky tones.', imageUrl: getPreview('sunset beach coastal background blurred') }
+            { label: 'Modern Office', desc: 'Clean, professional workspace background with soft depth of field.', imageUrl: getPortraitPreview('modern corporate office interior background, blurred bokeh') },
+            { label: 'Cozy Cafe', desc: 'Warm, ambient lighting with blurred coffee shop details. Casual & inviting.', imageUrl: getPortraitPreview('cozy coffee shop interior warm lighting background, blurred bokeh') },
+            { label: 'Nature', desc: 'Natural outdoor setting with greenery and dappled sunlight.', imageUrl: getPortraitPreview('outdoor nature park background with green trees, blurred bokeh') },
+            { label: 'Urban Street', desc: 'City streets, concrete textures, and dynamic urban energy.', imageUrl: getPortraitPreview('urban city street background, busy, blurred bokeh') },
+            { label: 'Studio Grey', desc: 'Classic neutral grey backdrop for pure focus on the subject.', imageUrl: getPortraitPreview('professional studio photography grey seamless backdrop') },
+            { label: 'Luxury Hotel', desc: 'High-end lobby aesthetic with warm lights, wood, and rich textures.', imageUrl: getPortraitPreview('luxury hotel lobby interior background, gold and wood, blurred bokeh') },
+            { label: 'Sunset Beach', desc: 'Bright, airy coastal vibe with warm sand and sky tones.', imageUrl: getPortraitPreview('sunset beach coastal background, golden hour, blurred bokeh') }
         ]
     },
     PORTRAIT_VIBE: {
         title: "Vibe & Lighting",
         items: [
-            { label: 'Professional', desc: 'Even, flattering lighting suitable for LinkedIn, CVs, and Corporate.', imageUrl: getPreview('professional headshot lighting clean sharp') },
-            { label: 'Candid & Soft', desc: 'Soft, natural light that feels unposed, authentic and friendly.', imageUrl: getPreview('soft natural light portrait photography candid') },
-            { label: 'Dramatic', desc: 'High contrast shadows and highlights for a moody, artistic look.', imageUrl: getPreview('dramatic portrait lighting chiaroscuro moody') },
-            { label: 'Golden Hour', desc: 'Warm, orange-hued lighting simulating sunset. Very flattering.', imageUrl: getPreview('golden hour sunset lighting portrait photography warm') },
-            { label: 'Black & White', desc: 'Artistic monochromatic processing with strong contrast and timeless feel.', imageUrl: getPreview('black and white artistic portrait photography high contrast') }
+            { label: 'Professional', desc: 'Even, flattering lighting suitable for LinkedIn, CVs, and Corporate.', imageUrl: getPortraitPreview('professional headshot lighting, clean sharp focus, neutral expression') },
+            { label: 'Candid & Soft', desc: 'Soft, natural light that feels unposed, authentic and friendly.', imageUrl: getPortraitPreview('soft natural light portrait photography, candid moment, slight smile, authentic') },
+            { label: 'Dramatic', desc: 'High contrast shadows and highlights for a moody, artistic look.', imageUrl: getPortraitPreview('dramatic portrait lighting, chiaroscuro, high contrast, moody shadow') },
+            { label: 'Golden Hour', desc: 'Warm, orange-hued lighting simulating sunset. Very flattering.', imageUrl: getPortraitPreview('golden hour sunset lighting portrait photography, warm orange glow, lens flare') },
+            { label: 'Black & White', desc: 'Artistic monochromatic processing with strong contrast and timeless feel.', imageUrl: getPortraitPreview('black and white artistic portrait photography, high contrast, monochrome') }
         ]
     },
     INTERIOR_STYLE: {
         title: "Design Style",
         items: [
-            { label: 'Minimalist', desc: 'Clean lines, decluttered spaces, and monochromatic palettes.', imageUrl: getPreview('minimalist interior design living room white clean') },
-            { label: 'Industrial', desc: 'Raw elements like exposed brick, metal, and concrete. Loft vibes.', imageUrl: getPreview('industrial loft interior design brick concrete metal') },
-            { label: 'Scandinavian', desc: 'Bright, airy, functional with warm wood and white tones. Japandi.', imageUrl: getPreview('scandinavian interior design bright wood white japandi') },
-            { label: 'Mid-Century', desc: 'Retro aesthetic with organic curves, teak wood, and olive greens.', imageUrl: getPreview('mid century modern living room interior design') },
-            { label: 'Bohemian', desc: 'Eclectic, layered textures, plants, rugs, and relaxed vibes.', imageUrl: getPreview('bohemian interior design plants textures eclectic') },
-            { label: 'Luxury Classic', desc: 'Ornate details, moldings, chandeliers, and sophisticated elegance.', imageUrl: getPreview('luxury classic interior design chandelier molding') },
-            { label: 'Cyberpunk', desc: 'Neon lights, dark tones, and futuristic tech elements.', imageUrl: getPreview('cyberpunk interior room neon lights futuristic') }
+            { label: 'Minimalist', desc: 'Clean lines, decluttered spaces, and monochromatic palettes.', imageUrl: getInteriorPreview('minimalist interior design, white walls, clean lines, decluttered, zen') },
+            { label: 'Industrial', desc: 'Raw elements like exposed brick, metal, and concrete. Loft vibes.', imageUrl: getInteriorPreview('industrial loft interior design, exposed brick walls, concrete floor, black metal accents') },
+            { label: 'Scandinavian', desc: 'Bright, airy, functional with warm wood and white tones. Japandi.', imageUrl: getInteriorPreview('scandinavian interior design, bright, warm light wood, white walls, hygge, japandi') },
+            { label: 'Mid-Century', desc: 'Retro aesthetic with organic curves, teak wood, and olive greens.', imageUrl: getInteriorPreview('mid century modern living room interior design, teak furniture, retro aesthetic, olive green') },
+            { label: 'Bohemian', desc: 'Eclectic, layered textures, plants, rugs, and relaxed vibes.', imageUrl: getInteriorPreview('bohemian interior design, many plants, layered rugs, eclectic textures, relaxed') },
+            { label: 'Luxury Classic', desc: 'Ornate details, moldings, chandeliers, and sophisticated elegance.', imageUrl: getInteriorPreview('luxury classic interior design, chandelier, wall molding, sophisticated elegance, expensive') },
+            { label: 'Cyberpunk', desc: 'Neon lights, dark tones, and futuristic tech elements.', imageUrl: getInteriorPreview('cyberpunk interior room, neon blue and pink lights, futuristic tech, dark atmosphere') }
         ]
     },
     INTERIOR_MATERIAL: {
         title: "Materials & Finishes",
         items: [
-            { label: 'Wood & White', desc: 'Warm oak or walnut paired with crisp white surfaces.', imageUrl: getPreview('interior material board wood and white texture') },
-            { label: 'Concrete & Metal', desc: 'Urban, raw textures using grey concrete and black steel.', imageUrl: getPreview('interior material board concrete and black metal texture') },
-            { label: 'Velvet & Gold', desc: 'Soft, plush fabrics accented with metallic gold finishes.', imageUrl: getPreview('interior material board velvet fabric and gold texture') },
-            { label: 'Earth Tones', desc: 'Beige, terracotta, linen, and olive greens for a grounded feel.', imageUrl: getPreview('interior material board earth tones linen terracotta texture') },
-            { label: 'Marble & Glass', desc: 'Sleek, reflective surfaces denoting high-end luxury.', imageUrl: getPreview('interior material board white marble and glass texture') },
-            { label: 'Vibrant', desc: 'Bold, vibrant color combinations for a playful and energetic look.', imageUrl: getPreview('interior material board vibrant colorful patterns texture') }
+            { label: 'Wood & White', desc: 'Warm oak or walnut paired with crisp white surfaces.', imageUrl: getInteriorPreview('interior featuring warm oak wood furniture and crisp white walls texture') },
+            { label: 'Concrete & Metal', desc: 'Urban, raw textures using grey concrete and black steel.', imageUrl: getInteriorPreview('interior featuring raw grey concrete walls and black steel furniture texture') },
+            { label: 'Velvet & Gold', desc: 'Soft, plush fabrics accented with metallic gold finishes.', imageUrl: getInteriorPreview('interior featuring plush velvet furniture and metallic gold accents texture') },
+            { label: 'Earth Tones', desc: 'Beige, terracotta, linen, and olive greens for a grounded feel.', imageUrl: getInteriorPreview('interior featuring earth tones, beige, terracotta, linen fabric, olive green') },
+            { label: 'Marble & Glass', desc: 'Sleek, reflective surfaces denoting high-end luxury.', imageUrl: getInteriorPreview('interior featuring white marble floors and glass surfaces, high end luxury') },
+            { label: 'Vibrant', desc: 'Bold, vibrant color combinations for a playful and energetic look.', imageUrl: getInteriorPreview('interior featuring vibrant colorful furniture, bold patterns, energetic colors') }
         ]
     }
   }), []);

@@ -55,7 +55,7 @@ export const VisualHelper: React.FC<VisualHelperProps> = ({
               >
                 {/* Hero Area (Image or Text Box) */}
                 <div 
-                  className="w-full aspect-[4/3] rounded-xl bg-slate-900 flex items-center justify-center relative overflow-hidden text-center mb-4 cursor-pointer ring-1 ring-slate-200 dark:ring-slate-800 group-hover:ring-brand-400/50 transition-all"
+                  className="w-full aspect-[4/3] rounded-xl bg-slate-100 dark:bg-slate-900 flex items-center justify-center relative overflow-hidden text-center mb-4 cursor-pointer ring-1 ring-slate-200 dark:ring-slate-800 group-hover:ring-brand-400/50 transition-all p-6"
                   onClick={() => item.imageUrl && setZoomedImage({ url: item.imageUrl, label: item.label })}
                 >
                   {item.imageUrl ? (
@@ -63,16 +63,16 @@ export const VisualHelper: React.FC<VisualHelperProps> = ({
                       <img 
                         src={item.imageUrl} 
                         alt={item.label} 
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                        className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-110 drop-shadow-xl" 
                         loading="lazy"
                       />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                        <Maximize2 className="text-white drop-shadow-md transform scale-75 group-hover:scale-100 transition-transform" size={32} />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                        <Maximize2 className="text-slate-900 dark:text-white drop-shadow-md transform scale-75 group-hover:scale-100 transition-transform" size={32} />
                       </div>
                     </>
                   ) : (
                     // Fallback Text if image fails or not provided
-                    <span className="text-white font-bold text-xl md:text-2xl leading-tight select-none px-4">
+                    <span className="text-slate-400 font-bold text-xl md:text-2xl leading-tight select-none px-4">
                       {item.label}
                     </span>
                   )}
@@ -93,7 +93,9 @@ export const VisualHelper: React.FC<VisualHelperProps> = ({
       {zoomedImage && (
         <div className="fixed inset-0 z-[110] bg-black/95 backdrop-blur-xl flex flex-col items-center justify-center p-4 animate-fadeIn" onClick={() => setZoomedImage(null)}>
           <div className="relative max-w-5xl w-full max-h-[85vh] flex flex-col items-center">
-             <img src={zoomedImage.url} alt={zoomedImage.label} className="max-w-full max-h-[75vh] rounded-lg shadow-2xl border border-slate-800" onClick={e => e.stopPropagation()} />
+             <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl">
+                <img src={zoomedImage.url} alt={zoomedImage.label} className="max-w-full max-h-[60vh] object-contain" onClick={e => e.stopPropagation()} />
+             </div>
              <h3 className="text-white font-bold mt-6 text-xl">{zoomedImage.label}</h3>
              <button className="absolute -top-12 right-0 p-2 text-white/50 hover:text-white transition-colors" onClick={() => setZoomedImage(null)}>
                 <X size={32} />
