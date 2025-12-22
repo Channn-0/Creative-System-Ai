@@ -15,45 +15,14 @@ import {
 } from "../types";
 import { resizeImageToAspectRatio } from "../utils";
 
-// Prevent "Cannot find name 'process'" error in environments without @types/node
-declare const process: any;
-
-const getApiKey = (): string | undefined => {
-  try {
-    if (typeof process !== 'undefined' && process.env) {
-      if (process.env.API_KEY) return process.env.API_KEY;
-      if (process.env.REACT_APP_API_KEY) return process.env.REACT_APP_API_KEY;
-      if (process.env.NEXT_PUBLIC_API_KEY) return process.env.NEXT_PUBLIC_API_KEY;
-    }
-  } catch (e) {}
-  
-  try {
-    // @ts-ignore
-    if (import.meta && import.meta.env) {
-        // @ts-ignore
-        if (import.meta.env.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
-        // @ts-ignore
-        if (import.meta.env.API_KEY) return import.meta.env.API_KEY;
-    }
-  } catch (e) {}
-
-  return undefined;
-};
-
-const getAIClient = () => {
-    const key = getApiKey();
-    if (!key) {
-        console.warn("Gemini API Key missing.");
-    }
-    return new GoogleGenAI({ apiKey: key || '' });
-};
-
+// Correct model names per guidelines
 const NANO_BANANA_MODEL = 'gemini-2.5-flash-image';
-const PROMPT_MODEL = 'gemini-2.5-flash';
+const PROMPT_MODEL = 'gemini-3-flash-preview';
+
+// Strictly use process.env.API_KEY for initialization as per rules
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 
 // --- DETAILED DESCRIPTIONS FOR PROMPTING ---
-// These match the UI descriptions to ensure the AI generates exactly what the user selected.
-
 const LIGHTING_DETAILS: Partial<Record<LightingStyle, string>> = {
   [LightingStyle.STUDIO]: 'Even, controlled lighting. Minimal shadows. Perfect for e-commerce.',
   [LightingStyle.NATURAL]: 'Mimics sunlight. Soft shadows. Good for lifestyle and organic products.',
@@ -133,7 +102,6 @@ interface GeneratePromptParams {
 }
 
 export const generateOptimizedPrompt = async (params: GeneratePromptParams): Promise<string> => {
-  const ai = getAIClient();
   const parts: Part[] = [];
 
   // Add Input Image for analysis
@@ -150,9 +118,8 @@ export const generateOptimizedPrompt = async (params: GeneratePromptParams): Pro
     const isMatchLighting = params.lighting === LightingStyle.MATCH_REFERENCE;
     const isMatchPerspective = params.perspective === CameraPerspective.MATCH_REFERENCE;
 
-    // Logic change: If MATCH_REFERENCE is selected, strictly analyze input image lighting
     const lightingDesc = isMatchLighting
-        ? "CRITICAL: ANALYZE the Input Image's lighting direction (shadows), intensity (hard/soft), and color temperature. The generated background MUST match this lighting physics exactly so the product looks naturally integrated, not pasted on."
+        ? "CRITICAL: ANALYZE the Input Image's lighting direction (shadows), intensity (hard/soft), and color temperature. The generated background MUST match this lighting physics exactly so the product looks naturally integrated."
         : (params.lighting && LIGHTING_DETAILS[params.lighting]) 
             ? `${params.lighting} (${LIGHTING_DETAILS[params.lighting]})` 
             : params.lighting;
@@ -176,7 +143,7 @@ export const generateOptimizedPrompt = async (params: GeneratePromptParams): Pro
     4. CRITICAL: Start with "Preserve the exact details, shape, and text of the primary product."
     `;
 
-    // Handle Style References (Studio only)
+    // Handle Style References
     if (params.styleReferences && params.styleReferences.length > 0 && params.referenceTactic !== ReferenceTactic.IGNORE) {
         for (const refImg of params.styleReferences) {
             parts.push({
@@ -187,14 +154,6 @@ export const generateOptimizedPrompt = async (params: GeneratePromptParams): Pro
             });
         }
         systemInstruction += `\n\n5. CRITICAL: Use the attached additional images as STYLE REFERENCES (Tactic: ${params.referenceTactic}). Extract their style/vibe into text descriptions.`;
-        
-        // If we are matching reference, we prefer the STYLE reference if it exists, otherwise fall back to input analysis above.
-        if (isMatchLighting) {
-           systemInstruction += `\n\n6. IMPORTANT: For lighting, prioritize the Input Product Image's lighting direction to ensure realism, but blend it with the Style Reference's atmosphere.`;
-        }
-        if (isMatchPerspective) {
-           systemInstruction += `\n\n7. IMPORTANT: You MUST analyze the camera angle/perspective in the reference image(s) and describe it exactly in the prompt to match.`;
-        }
     }
 
   } else if (params.mode === AppMode.PORTRAIT) {
@@ -212,7 +171,7 @@ export const generateOptimizedPrompt = async (params: GeneratePromptParams): Pro
     1. ANALYZE the person in the image.
     2. Describe a high-quality, realistic scene based on the 'New Environment' details provided.
     3. Describe the lighting based on 'Vibe' details provided.
-    4. CRITICAL: Start with "Preserve the exact facial features, skin tone, hair, and identity of the person in the input image."
+    4. CRITICAL: Start with "Preserve the exact facial features, skin tone, hair, and identity of the person."
     5. Output ONLY the raw prompt text.
     `;
   } else if (params.mode === AppMode.INTERIOR) {
@@ -242,10 +201,11 @@ export const generateOptimizedPrompt = async (params: GeneratePromptParams): Pro
       model: PROMPT_MODEL,
       contents: { parts },
     });
+    // Use .text property directly per guidelines
     return response.text?.trim() || "Preserve the input image exactly.";
   } catch (error) {
     console.error("Error generating prompt:", error);
-    throw new Error("Failed to generate prompt.");
+    throw new Error("Failed to generate prompt: Connection error or invalid API context.");
   }
 };
 
@@ -254,8 +214,6 @@ export const generateImage = async (
   prompt: string,
   aspectRatio: AspectRatio
 ): Promise<string> => {
-  const ai = getAIClient();
-
   const resizedBase64 = await resizeImageToAspectRatio(
     inputImage.base64, 
     inputImage.mimeType, 
