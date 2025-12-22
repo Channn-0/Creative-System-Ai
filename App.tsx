@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Sparkles, Wand2, Download, AlertCircle, X, ZoomIn, 
-    Sun, Moon, RefreshCw, Trash2
+    Sun, Moon, RefreshCw, Trash2, Key, ExternalLink
 } from 'lucide-react';
 import { ImageUpload } from './components/ImageUpload';
 import { Select } from './components/Select';
@@ -23,97 +23,41 @@ import {
 import { generateOptimizedPrompt, generateImage } from './services/gemini';
 import { downloadImage, addFilmGrain, historyDB } from './utils';
 
-// --- SVG PREVIEW GENERATORS ---
+// --- SVG PREVIEW GENERATORS (UNCHANGED) ---
 const generateLightingPreview = (type: LightingStyle): string => {
-    const w = 400; const h = 300;
-    const cx = w/2; const cy = h/2;
-    const capW = 50; const capH = 25;
-    const bodyW_bottom = 50; const bodyW_top = 70;
-    const bodyH = 110;
-    const crimpH = 15;
-    const capY = cy + 40;
-    const bodyY_bottom = capY;
-    const bodyY_top = bodyY_bottom - bodyH;
-    const tubePath = `M ${cx - bodyW_bottom/2} ${bodyY_bottom} L ${cx - bodyW_top/2} ${bodyY_top} L ${cx + bodyW_top/2} ${bodyY_top} L ${cx + bodyW_bottom/2} ${bodyY_bottom} Z`;
-    const crimpPath = `M ${cx - bodyW_top/2 - 2} ${bodyY_top} L ${cx - bodyW_top/2 - 2} ${bodyY_top - crimpH} L ${cx + bodyW_top/2 + 2} ${bodyY_top - crimpH} L ${cx + bodyW_top/2 + 2} ${bodyY_top} Z`;
-    const capPath = `M ${cx - capW/2} ${capY} L ${cx - capW/2} ${capY + capH} Q ${cx} ${capY + capH + 5} ${cx + capW/2} ${capY + capH} L ${cx + capW/2} ${capY} Z`;
-    let defs = '';
-    let content = '';
+    const w = 400; const h = 300; const cx = w/2; const cy = h/2; const capW = 50; const capH = 25; const bodyW_bottom = 50; const bodyW_top = 70; const bodyH = 110; const crimpH = 15; const capY = cy + 40; const bodyY_bottom = capY; const bodyY_top = bodyY_bottom - bodyH; const tubePath = `M ${cx - bodyW_bottom/2} ${bodyY_bottom} L ${cx - bodyW_top/2} ${bodyY_top} L ${cx + bodyW_top/2} ${bodyY_top} L ${cx + bodyW_bottom/2} ${bodyY_bottom} Z`; const crimpPath = `M ${cx - bodyW_top/2 - 2} ${bodyY_top} L ${cx - bodyW_top/2 - 2} ${bodyY_top - crimpH} L ${cx + bodyW_top/2 + 2} ${bodyY_top - crimpH} L ${cx + bodyW_top/2 + 2} ${bodyY_top} Z`; const capPath = `M ${cx - capW/2} ${capY} L ${cx - capW/2} ${capY + capH} Q ${cx} ${capY + capH + 5} ${cx + capW/2} ${capY + capH} L ${cx + capW/2} ${capY} Z`; let defs = ''; let content = '';
     switch (type) {
-        case LightingStyle.STUDIO:
-            defs = `<linearGradient id="studioTube" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#cbd5e1"/><stop offset="40%" stop-color="#ffffff"/><stop offset="60%" stop-color="#ffffff"/><stop offset="100%" stop-color="#94a3b8"/></linearGradient><filter id="softShadow" x="-50%" y="0" width="200%" height="200%"><feGaussianBlur in="SourceAlpha" stdDeviation="5"/><feOffset dy="5" result="offsetblur"/><feComponentTransfer><feFuncA type="linear" slope="0.3"/></feComponentTransfer><feMerge><feMergeNode in="offsetblur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
-            content = `<rect x="0" y="0" width="${w}" height="${h}" fill="#e2e8f0" /><path d="${capPath}" fill="#475569" filter="url(#softShadow)" /><path d="${tubePath}" fill="url(#studioTube)" filter="url(#softShadow)" /><path d="${crimpPath}" fill="#e2e8f0" stroke="#cbd5e1" filter="url(#softShadow)" />`;
-            break;
-        case LightingStyle.NATURAL:
-            defs = `<filter id="leaf" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur in="SourceGraphic" stdDeviation="3" /></filter>`;
-            content = `<rect x="0" y="0" width="${w}" height="${h}" fill="#f1f5f9" /><g transform="skewX(-30) translate(120, 0)" opacity="0.2" fill="#000"><path d="${capPath}" /><path d="${tubePath}" /><path d="${crimpPath}" /></g><g><path d="${capPath}" fill="#64748b" /><path d="${tubePath}" fill="#ffffff" /><path d="${crimpPath}" fill="#f1f5f9" /></g><path d="M${cx-150} ${cy-150} C${cx} ${cy-50}, ${cx+50} ${cy+50}, ${cx+200} ${cy+200}" stroke="#000" stroke-width="80" opacity="0.05" filter="url(#leaf)"/>`;
-            break;
-        case LightingStyle.CINEMATIC:
-            content = `<rect x="0" y="0" width="${w}" height="${h}" fill="#0a0a0a" /><defs><linearGradient id="cineLight" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#000"/><stop offset="40%" stop-color="#1e293b"/><stop offset="60%" stop-color="#fff"/><stop offset="100%" stop-color="#334155"/></linearGradient></defs><path d="M${w} 0 L${cx-40} ${h} L${w} ${h} Z" fill="#fff" opacity="0.07" /><g><path d="${capPath}" fill="#0f172a" stroke="#334155" stroke-width="1"/><path d="${tubePath}" fill="url(#cineLight)" /><path d="${crimpPath}" fill="url(#cineLight)" /></g>`;
-            break;
-        case LightingStyle.NEON:
-            content = `<rect x="0" y="0" width="${w}" height="${h}" fill="#0a0a0a" /><defs><filter id="neonGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><g filter="url(#neonGlow)"><path d="${capPath}" stroke="#ec4899" stroke-width="3" fill="#171717" /><path d="${tubePath}" stroke="#3b82f6" stroke-width="3" fill="#171717" /><path d="${crimpPath}" stroke="#ec4899" stroke-width="3" fill="#171717" /></g>`;
-            break;
-        case LightingStyle.MINIMALIST:
-            content = `<rect x="0" y="0" width="${w}" height="${h}" fill="#f8fafc" /><g opacity="0.8"><path d="${capPath}" fill="#cbd5e1" /><path d="${tubePath}" fill="#ffffff" stroke="#e2e8f0" /><path d="${crimpPath}" fill="#f1f5f9" stroke="#e2e8f0" /></g>`;
-            break;
-        case LightingStyle.PRODUCT_BOOST:
-            content = `<rect x="0" y="0" width="${w}" height="${h}" fill="#facc15" /><circle cx="${cx}" cy="${cy}" r="120" fill="#fef08a" opacity="0.5" /><g filter="drop-shadow(0px 10px 10px rgba(0,0,0,0.2))"><path d="${capPath}" fill="#334155" /><path d="${tubePath}" fill="#ffffff" /><path d="${crimpPath}" fill="#ffffff" /></g><rect x="${cx-15}" y="${bodyY_top + 10}" width="10" height="80" fill="white" opacity="0.4" rx="5" />`;
-            break;
-        case LightingStyle.MATCH_REFERENCE:
-            content = `<rect x="0" y="0" width="${w}" height="${h}" fill="#1e293b" /><g stroke="#ffffff" stroke-width="2" fill="none" opacity="0.5"><path d="${capPath}" stroke-dasharray="4 4" /><path d="${tubePath}" stroke-dasharray="4 4" /><path d="${crimpPath}" stroke-dasharray="4 4" /></g><rect x="0" y="${cy}" width="${w}" height="2" fill="#3b82f6" opacity="0.8"><animate attributeName="y" from="0" to="${h}" duration="2s" repeatCount="indefinite" /></rect>`;
-            break;
+        case LightingStyle.STUDIO: defs = `<linearGradient id="studioTube" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#cbd5e1"/><stop offset="40%" stop-color="#ffffff"/><stop offset="60%" stop-color="#ffffff"/><stop offset="100%" stop-color="#94a3b8"/></linearGradient><filter id="softShadow" x="-50%" y="0" width="200%" height="200%"><feGaussianBlur in="SourceAlpha" stdDeviation="5"/><feOffset dy="5" result="offsetblur"/><feComponentTransfer><feFuncA type="linear" slope="0.3"/></feComponentTransfer><feMerge><feMergeNode in="offsetblur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`; content = `<rect x="0" y="0" width="${w}" height="${h}" fill="#e2e8f0" /><path d="${capPath}" fill="#475569" filter="url(#softShadow)" /><path d="${tubePath}" fill="url(#studioTube)" filter="url(#softShadow)" /><path d="${crimpPath}" fill="#e2e8f0" stroke="#cbd5e1" filter="url(#softShadow)" />`; break;
+        case LightingStyle.NATURAL: defs = `<filter id="leaf" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur in="SourceGraphic" stdDeviation="3" /></filter>`; content = `<rect x="0" y="0" width="${w}" height="${h}" fill="#f1f5f9" /><g transform="skewX(-30) translate(120, 0)" opacity="0.2" fill="#000"><path d="${capPath}" /><path d="${tubePath}" /><path d="${crimpPath}" /></g><g><path d="${capPath}" fill="#64748b" /><path d="${tubePath}" fill="#ffffff" /><path d="${crimpPath}" fill="#f1f5f9" /></g><path d="M${cx-150} ${cy-150} C${cx} ${cy-50}, ${cx+50} ${cy+50}, ${cx+200} ${cy+200}" stroke="#000" stroke-width="80" opacity="0.05" filter="url(#leaf)"/>`; break;
+        case LightingStyle.CINEMATIC: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="#0a0a0a" /><defs><linearGradient id="cineLight" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#000"/><stop offset="40%" stop-color="#1e293b"/><stop offset="60%" stop-color="#fff"/><stop offset="100%" stop-color="#334155"/></linearGradient></defs><path d="M${w} 0 L${cx-40} ${h} L${w} ${h} Z" fill="#fff" opacity="0.07" /><g><path d="${capPath}" fill="#0f172a" stroke="#334155" stroke-width="1"/><path d="${tubePath}" fill="url(#cineLight)" /><path d="${crimpPath}" fill="url(#cineLight)" /></g>`; break;
+        case LightingStyle.NEON: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="#0a0a0a" /><defs><filter id="neonGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><g filter="url(#neonGlow)"><path d="${capPath}" stroke="#ec4899" stroke-width="3" fill="#171717" /><path d="${tubePath}" stroke="#3b82f6" stroke-width="3" fill="#171717" /><path d="${crimpPath}" stroke="#ec4899" stroke-width="3" fill="#171717" /></g>`; break;
+        case LightingStyle.MINIMALIST: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="#f8fafc" /><g opacity="0.8"><path d="${capPath}" fill="#cbd5e1" /><path d="${tubePath}" fill="#ffffff" stroke="#e2e8f0" /><path d="${crimpPath}" fill="#f1f5f9" stroke="#e2e8f0" /></g>`; break;
+        case LightingStyle.PRODUCT_BOOST: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="#facc15" /><circle cx="${cx}" cy="${cy}" r="120" fill="#fef08a" opacity="0.5" /><g filter="drop-shadow(0px 10px 10px rgba(0,0,0,0.2))"><path d="${capPath}" fill="#334155" /><path d="${tubePath}" fill="#ffffff" /><path d="${crimpPath}" fill="#ffffff" /></g><rect x="${cx-15}" y="${bodyY_top + 10}" width="10" height="80" fill="white" opacity="0.4" rx="5" />`; break;
+        case LightingStyle.MATCH_REFERENCE: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="#1e293b" /><g stroke="#ffffff" stroke-width="2" fill="none" opacity="0.5"><path d="${capPath}" stroke-dasharray="4 4" /><path d="${tubePath}" stroke-dasharray="4 4" /><path d="${crimpPath}" stroke-dasharray="4 4" /></g><rect x="0" y="${cy}" width="${w}" height="2" fill="#3b82f6" opacity="0.8"><animate attributeName="y" from="0" to="${h}" duration="2s" repeatCount="indefinite" /></rect>`; break;
     }
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">${defs}${content}</svg>`;
     return `data:image/svg+xml;base64,${btoa(svg)}`;
 };
 
 const generateAnglePreview = (angle: CameraPerspective): string => {
-    const w = 400; const h = 300;
-    const cx = w/2; const cy = h/2;
-    const bg = "#334155";
-    const cTube = "#f1f5f9";
-    const cCap = "#475569";
-    const cHighlight = "#ffffff";
-    let content = '';
-    const drawCamera = (scale = 1, rotate = 0) => `<g transform="translate(${cx}, ${cy}) rotate(${rotate}) scale(${scale}) translate(-${cx}, -${cy})"><rect x="${cx-60}" y="${cy-40}" width="120" height="80" rx="10" fill="none" stroke="white" stroke-width="4"/><circle cx="${cx}" cy="${cy}" r="25" fill="none" stroke="white" stroke-width="4"/><rect x="${cx+20}" y="${cy-55}" width="20" height="15" fill="white"/></g>`;
+    const w = 400; const h = 300; const cx = w/2; const cy = h/2; const bg = "#334155"; const cTube = "#f1f5f9"; const cCap = "#475569"; const cHighlight = "#ffffff"; let content = ''; const drawCamera = (scale = 1, rotate = 0) => `<g transform="translate(${cx}, ${cy}) rotate(${rotate}) scale(${scale}) translate(-${cx}, -${cy})"><rect x="${cx-60}" y="${cy-40}" width="120" height="80" rx="10" fill="none" stroke="white" stroke-width="4"/><circle cx="${cx}" cy="${cy}" r="25" fill="none" stroke="white" stroke-width="4"/><rect x="${cx+20}" y="${cy-55}" width="20" height="15" fill="white"/></g>`;
     switch (angle) {
-        case CameraPerspective.FRONT:
-             content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" /><g transform="translate(${cx}, ${cy})"><rect x="-35" y="-60" width="70" height="15" fill="${cTube}" /><path d="M -25 60 L -35 -45 L 35 -45 L 25 60 Z" fill="${cTube}" /><rect x="-25" y="60" width="50" height="25" fill="${cCap}" /><rect x="-10" y="-40" width="5" height="90" fill="${cHighlight}" opacity="0.3" /><text x="0" y="110" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">FRONT</text></g>`;
-            break;
-        case CameraPerspective.TOP_DOWN:
-             content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" /><g transform="rotate(-90 ${cx} ${cy}) translate(0, -10)"><path d="M ${cx-30} ${cy+65} L ${cx-40} ${cy-45} L ${cx+40} ${cy-45} L ${cx+30} ${cy+65} Z" fill="black" opacity="0.3" filter="blur(4px)" transform="translate(5, 5)" /><rect x="${cx - 25}" y="${cy + 60}" width="50" height="25" fill="${cCap}" /><path d="M ${cx - 25} ${cy + 60} L ${cx - 35} ${cy - 50} L ${cx + 35} ${cy - 50} L ${cx + 25} ${cy + 60} Z" fill="${cTube}" /><rect x="${cx - 35}" y="${cy - 65}" width="70" height="15" fill="#e2e8f0" /></g><text x="${cx}" y="${cy+120}" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">FLAT LAY</text>`;
-            break;
-        case CameraPerspective.ISOMETRIC:
-             content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" /><g transform="translate(${cx}, ${cy})"><path d="M -25 60 L -25 85 L 25 85 L 25 60 Z" fill="${cCap}" /><path d="M 25 60 L 25 85 L 45 65 L 45 40 Z" fill="#334155" opacity="0.5"/><path d="M -25 60 L -35 -45 L 35 -45 L 25 60 Z" fill="${cTube}" /><path d="M 25 60 L 35 -45 L 55 -65 L 45 40 Z" fill="#cbd5e1" /><path d="M -35 -45 L -35 -60 L 35 -60 L 35 -45 Z" fill="#e2e8f0" /><path d="M 35 -45 L 35 -60 L 55 -80 L 55 -65 Z" fill="#94a3b8" /><text x="0" y="120" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">ISOMETRIC</text></g>`;
-            break;
-        case CameraPerspective.LOW_ANGLE:
-             content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" /><g transform="translate(${cx}, ${cy})"><ellipse cx="0" cy="70" rx="35" ry="12" fill="#1e293b" stroke="${cCap}" stroke-width="2"/><path d="M -35 70 L -35 45 L 35 45 L 35 70 Z" fill="${cCap}" /><path d="M -35 45 L -20 -50 L 20 -50 L 35 45 Z" fill="${cTube}" /><rect x="-20" y="-65" width="40" height="15" fill="#e2e8f0" /><path d="M -200 80 L 200 80 M -200 120 L 200 120" stroke="white" stroke-opacity="0.1" /><text x="0" y="120" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">LOW ANGLE</text></g>`;
-            break;
-        case CameraPerspective.HIGH_ANGLE:
-             content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" /><g transform="translate(${cx}, ${cy})"><ellipse cx="0" cy="80" rx="15" ry="8" fill="${cCap}" opacity="0.5"/> <path d="M -15 80 L -45 -20 L 45 -20 L 15 80 Z" fill="${cTube}" /><path d="M -45 -20 Q 0 -30 45 -20 L 45 -40 Q 0 -50 -45 -40 Z" fill="#e2e8f0" /><text x="0" y="120" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">HIGH ANGLE</text></g>`;
-             break;
-        case CameraPerspective.CLOSE_UP:
-             content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" />${drawCamera(1.8)}<text x="${cx}" y="${cy+130}" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">MACRO CLOSE-UP</text>`;
-             break;
-        case CameraPerspective.WIDE_ANGLE:
-             content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" /><line x1="0" y1="0" x2="${cx-60}" y2="${cy-40}" stroke="white" stroke-width="3" /><line x1="${w}" y1="0" x2="${cx+60}" y2="${cy-40}" stroke="white" stroke-width="3" /><line x1="0" y1="${h}" x2="${cx-60}" y2="${cy+40}" stroke="white" stroke-width="3" /><line x1="${w}" y1="${h}" x2="${cx+60}" y2="${cy+40}" stroke="white" stroke-width="3" />${drawCamera(1)}<text x="${cx}" y="${cy+120}" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">WIDE ANGLE</text>`;
-             break;
-        case CameraPerspective.DUTCH:
-             content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" />${drawCamera(1, -15)}<text x="${cx}" y="${cy+120}" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">DUTCH ANGLE</text>`;
-             break;
-        default:
-             content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" />${drawCamera(1)}<text x="${cx}" y="${cy+80}" fill="white" text-anchor="middle" font-family="sans-serif">${angle}</text>`;
-             break;
+        case CameraPerspective.FRONT: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" /><g transform="translate(${cx}, ${cy})"><rect x="-35" y="-60" width="70" height="15" fill="${cTube}" /><path d="M -25 60 L -35 -45 L 35 -45 L 25 60 Z" fill="${cTube}" /><rect x="-25" y="60" width="50" height="25" fill="${cCap}" /><rect x="-10" y="-40" width="5" height="90" fill="${cHighlight}" opacity="0.3" /><text x="0" y="110" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">FRONT</text></g>`; break;
+        case CameraPerspective.TOP_DOWN: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" /><g transform="rotate(-90 ${cx} ${cy}) translate(0, -10)"><path d="M ${cx-30} ${cy+65} L ${cx-40} ${cy-45} L ${cx+40} ${cy-45} L ${cx+30} ${cy+65} Z" fill="black" opacity="0.3" filter="blur(4px)" transform="translate(5, 5)" /><rect x="${cx - 25}" y="${cy + 60}" width="50" height="25" fill="${cCap}" /><path d="M ${cx - 25} ${cy + 60} L ${cx - 35} ${cy - 50} L ${cx + 35} ${cy - 50} L ${cx + 25} ${cy + 60} Z" fill="${cTube}" /><rect x="${cx - 35}" y="${cy - 65}" width="70" height="15" fill="#e2e8f0" /></g><text x="${cx}" y="${cy+120}" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">FLAT LAY</text>`; break;
+        case CameraPerspective.ISOMETRIC: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" /><g transform="translate(${cx}, ${cy})"><path d="M -25 60 L -25 85 L 25 85 L 25 60 Z" fill="${cCap}" /><path d="M 25 60 L 25 85 L 45 65 L 45 40 Z" fill="#334155" opacity="0.5"/><path d="M -25 60 L -35 -45 L 35 -45 L 25 60 Z" fill="${cTube}" /><path d="M 25 60 L 35 -45 L 55 -65 L 45 40 Z" fill="#cbd5e1" /><path d="M -35 -45 L -35 -60 L 35 -60 L 35 -45 Z" fill="#e2e8f0" /><path d="M 35 -45 L 35 -60 L 55 -80 L 55 -65 Z" fill="#94a3b8" /><text x="0" y="120" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">ISOMETRIC</text></g>`; break;
+        case CameraPerspective.LOW_ANGLE: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" /><g transform="translate(${cx}, ${cy})"><ellipse cx="0" cy="70" rx="35" ry="12" fill="#1e293b" stroke="${cCap}" stroke-width="2"/><path d="M -35 70 L -35 45 L 35 45 L 35 70 Z" fill="${cCap}" /><path d="M -35 45 L -20 -50 L 20 -50 L 35 45 Z" fill="${cTube}" /><rect x="-20" y="-65" width="40" height="15" fill="#e2e8f0" /><path d="M -200 80 L 200 80 M -200 120 L 200 120" stroke="white" stroke-opacity="0.1" /><text x="0" y="120" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">LOW ANGLE</text></g>`; break;
+        case CameraPerspective.HIGH_ANGLE: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" /><g transform="translate(${cx}, ${cy})"><ellipse cx="0" cy="80" rx="15" ry="8" fill="${cCap}" opacity="0.5"/> <path d="M -15 80 L -45 -20 L 45 -20 L 15 80 Z" fill="${cTube}" /><path d="M -45 -20 Q 0 -30 45 -20 L 45 -40 Q 0 -50 -45 -40 Z" fill="#e2e8f0" /><text x="0" y="120" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">HIGH ANGLE</text></g>`; break;
+        case CameraPerspective.CLOSE_UP: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" />${drawCamera(1.8)}<text x="${cx}" y="${cy+130}" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">MACRO CLOSE-UP</text>`; break;
+        case CameraPerspective.WIDE_ANGLE: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" /><line x1="0" y1="0" x2="${cx-60}" y2="${cy-40}" stroke="white" stroke-width="3" /><line x1="${w}" y1="0" x2="${cx+60}" y2="${cy-40}" stroke="white" stroke-width="3" /><line x1="0" y1="${h}" x2="${cx-60}" y2="${cy+40}" stroke="white" stroke-width="3" /><line x1="${w}" y1="${h}" x2="${cx+60}" y2="${cy+40}" stroke="white" stroke-width="3" />${drawCamera(1)}<text x="${cx}" y="${cy+120}" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">WIDE ANGLE</text>`; break;
+        case CameraPerspective.DUTCH: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" />${drawCamera(1, -15)}<text x="${cx}" y="${cy+120}" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">DUTCH ANGLE</text>`; break;
+        default: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" />${drawCamera(1)}<text x="${cx}" y="${cy+80}" fill="white" text-anchor="middle" font-family="sans-serif">${angle}</text>`; break;
     }
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">${content}</svg>`;
     return `data:image/svg+xml;base64,${btoa(svg)}`;
 };
 
 const generatePortraitEnvPreview = (env: PortraitEnvironment): string => {
-    const w = 400; const h = 300;
-    const personSvg = `<defs><linearGradient id="personGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#475569" /><stop offset="100%" stop-color="#334155" /></linearGradient></defs><g transform="translate(200, 300)"><path d="M -100 0 C -100 -60, -60 -110, 0 -110 C 60 -110, 100 -60, 100 0 Z" fill="url(#personGrad)" /><rect x="-25" y="-130" width="50" height="40" fill="url(#personGrad)" /><circle cx="0" cy="-160" r="55" fill="url(#personGrad)" /></g>`;
-    let bgContent = '';
+    const w = 400; const h = 300; const personSvg = `<defs><linearGradient id="personGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#475569" /><stop offset="100%" stop-color="#334155" /></linearGradient></defs><g transform="translate(200, 300)"><path d="M -100 0 C -100 -60, -60 -110, 0 -110 C 60 -110, 100 -60, 100 0 Z" fill="url(#personGrad)" /><rect x="-25" y="-130" width="50" height="40" fill="url(#personGrad)" /><circle cx="0" cy="-160" r="55" fill="url(#personGrad)" /></g>`; let bgContent = '';
     switch (env) {
         case PortraitEnvironment.OFFICE: bgContent = `<rect width="${w}" height="${h}" fill="#f1f5f9" /><defs><pattern id="blinds" x="0" y="0" width="10" height="20" patternUnits="userSpaceOnUse"><rect x="0" y="18" width="10" height="2" fill="#cbd5e1" /></pattern></defs><rect width="${w}" height="${h}" fill="url(#blinds)" opacity="0.6" />`; break;
         case PortraitEnvironment.CAFE: bgContent = `<rect width="${w}" height="${h}" fill="#451a03" /><circle cx="50" cy="50" r="20" fill="#fbbf24" opacity="0.4" filter="blur(5px)" /><circle cx="350" cy="120" r="30" fill="#fbbf24" opacity="0.4" filter="blur(8px)" />`; break;
@@ -128,13 +72,7 @@ const generatePortraitEnvPreview = (env: PortraitEnvironment): string => {
 }
 
 const generateAspectRatioPreview = (ratio: AspectRatio): string => {
-    const w = 400; const h = 300; const cx = w/2; const cy = h/2; const maxW = 220; const maxH = 160;
-    const [rw, rh] = ratio.split(':').map(Number); const r = rw / rh;
-    let boxW, boxH;
-    if (r > (maxW/maxH)) { boxW = maxW; boxH = maxW / r; } else { boxH = maxH; boxW = maxH * r; }
-    const x = cx - boxW/2; const y = cy - boxH/2;
-    const content = `<rect x="0" y="0" width="${w}" height="${h}" fill="#f1f5f9" /><rect x="${x}" y="${y}" width="${boxW}" height="${boxH}" fill="#ffffff" stroke="#334155" stroke-width="4" rx="8" /><text x="${cx}" y="${cy}" fill="#0f172a" font-family="sans-serif" font-size="32" font-weight="800" text-anchor="middle" dominant-baseline="middle">${ratio}</text>`;
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">${content}</svg>`;
+    const w = 400; const h = 300; const cx = w/2; const cy = h/2; const maxW = 220; const maxH = 160; const [rw, rh] = ratio.split(':').map(Number); const r = rw / rh; let boxW, boxH; if (r > (maxW/maxH)) { boxW = maxW; boxH = maxW / r; } else { boxH = maxH; boxW = maxH * r; } const x = cx - boxW/2; const y = cy - boxH/2; const content = `<rect x="0" y="0" width="${w}" height="${h}" fill="#f1f5f9" /><rect x="${x}" y="${y}" width="${boxW}" height="${boxH}" fill="#ffffff" stroke="#334155" stroke-width="4" rx="8" /><text x="${cx}" y="${cy}" fill="#0f172a" font-family="sans-serif" font-size="32" font-weight="800" text-anchor="middle" dominant-baseline="middle">${ratio}</text>`; const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">${content}</svg>`;
     return `data:image/svg+xml;base64,${btoa(svg)}`;
 }
 
@@ -171,13 +109,26 @@ const App: React.FC = () => {
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [activeHelper, setActiveHelper] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [hasApiKey, setHasApiKey] = useState<boolean>(true); // Assume true initially
 
   useEffect(() => {
     const root = window.document.documentElement;
     if (isDarkMode) root.classList.add('dark');
     else root.classList.remove('dark');
     historyDB.getAll().then(items => { setHistory(items); });
+    
+    // Check key status on mount
+    if (window.aistudio) {
+        window.aistudio.hasSelectedApiKey().then(setHasApiKey);
+    }
   }, [isDarkMode]);
+
+  const handleConnectKey = async () => {
+    if (window.aistudio) {
+        await window.aistudio.openSelectKey();
+        setHasApiKey(true); // Proceed as instructed
+    }
+  };
 
   useEffect(() => {
     if (currentMode === AppMode.STUDIO && referenceTactic === ReferenceTactic.FULL && styleImages.length > 0) {
@@ -218,6 +169,11 @@ const App: React.FC = () => {
 
   const handleGenerate = async () => {
     if (!activeInputImage) { setStatus(prev => ({ ...prev, error: "Please upload an image first." })); return; }
+    
+    // Double check key before generate
+    const keyOk = await window.aistudio.hasSelectedApiKey();
+    if (!keyOk) { setHasApiKey(false); return; }
+
     let finalAspectRatio = aspectRatio;
     if (currentMode === AppMode.INTERIOR) {
         const img = new Image();
@@ -236,6 +192,7 @@ const App: React.FC = () => {
       await historyDB.add({ id: Date.now().toString(), mode: currentMode, timestamp: Date.now(), imageUrl: grainedBase64, prompt, aspectRatio: finalAspectRatio });
       const freshHistory = await historyDB.getAll(); setHistory(freshHistory);
     } catch (err: any) {
+      if (err.message.includes("API Key")) setHasApiKey(false);
       setStatus(prev => ({ ...prev, error: err.message || "Generation failed" }));
     } finally { setStatus(prev => ({ ...prev, isGeneratingPrompt: false, isGeneratingImage: false })); }
   };
@@ -255,6 +212,27 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300 font-sans pb-20 lg:pb-0 lg:pl-24">
+      {/* Setup Overlay */}
+      {!hasApiKey && (
+        <div className="fixed inset-0 z-[200] bg-slate-950/80 backdrop-blur-2xl flex items-center justify-center p-6">
+            <div className="max-w-md w-full bg-white dark:bg-slate-900 rounded-3xl p-8 border border-brand-400/30 shadow-2xl animate-fadeIn text-center">
+                <div className="w-20 h-20 bg-brand-400/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Key className="text-brand-400 w-10 h-10" />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">Connection Required</h2>
+                <p className="text-slate-500 dark:text-slate-400 mb-8 text-sm leading-relaxed">
+                    N.ERA Pro requires a secure connection to your Gemini API Project. Please connect your project to begin generating high-fidelity assets.
+                </p>
+                <div className="space-y-4">
+                    <Button onClick={handleConnectKey} className="w-full h-14 rounded-2xl" icon={<Sparkles size={18} />}>Connect to Gemini</Button>
+                    <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 text-xs text-slate-400 hover:text-brand-400 transition-colors group">
+                        Requires a paid GCP project <ExternalLink size={12} className="group-hover:translate-x-0.5 transition-transform" />
+                    </a>
+                </div>
+            </div>
+        </div>
+      )}
+
       <Navigation currentMode={currentMode} onModeChange={handleModeChange} onHistoryClick={() => setIsHistoryOpen(true)} hasHistory={history.length > 0} />
       <HistorySidebar isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} history={history} onSelect={(item) => { setGeneratedImageUrl(item.imageUrl); setPromptText(item.prompt); setAspectRatio(item.aspectRatio); setCurrentMode(item.mode); setIsHistoryOpen(false); }} onClear={async () => { await historyDB.clear(); setHistory([]); }} onDelete={async (id) => { await historyDB.delete(id); const fresh = await historyDB.getAll(); setHistory(fresh); }} />
       {activeHelper && helperData[activeHelper as keyof typeof helperData] && <VisualHelper title={helperData[activeHelper as keyof typeof helperData].title} description="Select an option." items={helperData[activeHelper as keyof typeof helperData].items} isOpen={!!activeHelper} onClose={() => setActiveHelper(null)} />}
