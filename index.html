@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en" class="dark">
   <head>
@@ -21,11 +22,26 @@
             },
             animation: {
               'fadeIn': 'fadeIn 0.3s ease-in-out',
+              'shimmer': 'shimmer 2s infinite linear',
+              'pulse-soft': 'pulse-soft 2s infinite ease-in-out',
+              'bracket-pulse': 'bracket-pulse 2.5s ease-in-out infinite',
             },
             keyframes: {
               fadeIn: {
                 '0%': { opacity: '0', transform: 'translateY(10px)' },
                 '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              shimmer: {
+                '0%': { backgroundPosition: '-200% 0' },
+                '100%': { backgroundPosition: '200% 0' },
+              },
+              'pulse-soft': {
+                '0%, 100%': { transform: 'scale(1)', opacity: '1' },
+                '50%': { transform: 'scale(1.03)', opacity: '0.8' },
+              },
+              'bracket-pulse': {
+                '0%, 100%': { transform: 'scale(1)', opacity: '0.8' },
+                '50%': { transform: 'scale(1.15)', opacity: '1' },
               }
             }
           }
@@ -36,6 +52,7 @@
     <style>
       body {
         font-family: 'Inter', sans-serif;
+        overflow: hidden;
       }
       /* Custom Scrollbar */
       ::-webkit-scrollbar {
@@ -56,62 +73,98 @@
         background: #64748b;
       }
 
-      /* Snake Border Animation */
-      .snake-border span {
+      /* Mesh Gradient Background for Loading */
+      .mesh-gradient {
+        background-color: #0f172a;
+        background-image: 
+          radial-gradient(at 0% 0%, hsla(253,16%,12%,1) 0, transparent 50%), 
+          radial-gradient(at 50% 0%, hsla(225,39%,20%,1) 0, transparent 50%), 
+          radial-gradient(at 100% 0%, hsla(339,49%,20%,1) 0, transparent 50%), 
+          radial-gradient(at 0% 50%, hsla(20,53%,15%,1) 0, transparent 50%), 
+          radial-gradient(at 100% 50%, hsla(157,24%,15%,1) 0, transparent 50%), 
+          radial-gradient(at 0% 100%, hsla(22,100%,30%,1) 0, transparent 50%), 
+          radial-gradient(at 50% 100%, hsla(240,0%,50%,1) 0, transparent 50%), 
+          radial-gradient(at 100% 100%, hsla(334,80%,40%,1) 0, transparent 50%);
+        background-size: 200% 200%;
+        animation: mesh-move 15s ease-in-out infinite alternate;
+      }
+
+      @keyframes mesh-move {
+        0% { background-position: 0% 50%; }
+        100% { background-position: 100% 50%; }
+      }
+
+      /* Magical Border Container */
+      .magic-border-container {
+        position: relative;
+        overflow: hidden;
+        border-radius: 1.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      /* Rotating Gradient Segment - Thinner and more subtle */
+      .magic-border-container::before {
+        content: '';
         position: absolute;
-        display: block;
+        width: 180%;
+        height: 180%;
+        background: conic-gradient(transparent, transparent, transparent, rgba(255,255,255,0.4), #FACC15);
+        animation: rotate-conic 1.2s linear infinite;
+        z-index: 0;
       }
-      .snake-border span:nth-child(1) {
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 4px;
-        background: linear-gradient(90deg, transparent, #FACC15);
-        animation: btn-anim1 1s linear infinite;
+
+      @keyframes rotate-conic {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
       }
-      @keyframes btn-anim1 {
-        0% { left: -100%; }
-        50%,100% { left: 100%; }
+
+      /* 
+         Clockwise Spin with Pause Cycle:
+         Total cycle: 1.7s
+      */
+      @keyframes spin-pause {
+        0% { transform: rotate(0deg); }
+        70.5% { transform: rotate(360deg); }
+        100% { transform: rotate(360deg); }
       }
-      .snake-border span:nth-child(2) {
-        top: -100%;
-        right: 0;
-        width: 4px;
-        height: 100%;
-        background: linear-gradient(180deg, transparent, #FACC15);
-        animation: btn-anim2 1s linear infinite;
-        animation-delay: 0.25s;
+      .animate-spin-weighted {
+        animation: spin-pause 1.7s cubic-bezier(0.7, 0, 0.3, 1) infinite;
+        will-change: transform;
       }
-      @keyframes btn-anim2 {
-        0% { top: -100%; }
-        50%,100% { top: 100%; }
+
+      /* Masking the center with High-Blur Glass */
+      .magic-inner-glass {
+        position: absolute;
+        inset: 1.5px; 
+        background: rgba(15, 23, 42, 0.4);
+        backdrop-filter: blur(44px);
+        -webkit-backdrop-filter: blur(44px);
+        border-radius: calc(1.25rem - 1.5px);
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
-      .snake-border span:nth-child(3) {
-        bottom: 0;
-        right: -100%;
-        width: 100%;
-        height: 4px;
-        background: linear-gradient(270deg, transparent, #FACC15);
-        animation: btn-anim3 1s linear infinite;
-        animation-delay: 0.5s;
+
+      /* Sharp Focal Brackets */
+      .focal-bracket {
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        border-color: rgba(255, 255, 255, 0.9);
+        border-style: solid;
+        pointer-events: none;
+        z-index: 10;
+        will-change: transform;
       }
-      @keyframes btn-anim3 {
-        0% { right: -100%; }
-        50%,100% { right: 100%; }
-      }
-      .snake-border span:nth-child(4) {
-        bottom: -100%;
-        left: 0;
-        width: 4px;
-        height: 100%;
-        background: linear-gradient(360deg, transparent, #FACC15);
-        animation: btn-anim4 1s linear infinite;
-        animation-delay: 0.75s;
-      }
-      @keyframes btn-anim4 {
-        0% { bottom: -100%; }
-        50%,100% { bottom: 100%; }
-      }
+      .bracket-tl { top: -14px; left: -14px; border-width: 1.5px 0 0 1.5px; border-top-left-radius: 8px; }
+      .bracket-tr { top: -14px; right: -14px; border-width: 1.5px 1.5px 0 0; border-top-right-radius: 8px; }
+      .bracket-bl { bottom: -14px; left: -14px; border-width: 0 0 1.5px 1.5px; border-bottom-left-radius: 8px; }
+      .bracket-br { bottom: -14px; right: -14px; border-width: 0 1.5px 1.5px 0; border-bottom-right-radius: 8px; }
+
     </style>
   <script type="importmap">
 {

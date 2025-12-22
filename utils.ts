@@ -1,11 +1,11 @@
-import { ImageFile, AspectRatio } from './types';
+
+import { ImageFile, AspectRatio, HistoryItem } from './types';
 
 export const fileToImageFile = (file: File): Promise<ImageFile> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result as string;
-      // Extract base64 data (remove data:image/xxx;base64, prefix)
       const base64Data = result.split(',')[1];
       resolve({
         file,
@@ -41,25 +41,26 @@ export const resizeImageToAspectRatio = (
       const currentRatio = img.width / img.height;
 
       let canvasWidth, canvasHeight;
-      let drawX, drawY, drawW, drawH;
-
-      // Determine canvas dimensions to contain the image within the target aspect ratio
-      // without cropping (Letterboxing/Pillarboxing)
-      if (currentRatio > targetRatio) {
-         // Image is wider than target. Fit to width.
-         canvasWidth = img.width;
-         canvasHeight = img.width / targetRatio;
+      if (targetRatio > 1) {
+          canvasWidth = Math.max(img.width, 1024);
+          canvasHeight = canvasWidth / targetRatio;
       } else {
-         // Image is taller than target. Fit to height.
-         canvasHeight = img.height;
-         canvasWidth = img.height * targetRatio;
+          canvasHeight = Math.max(img.height, 1024);
+          canvasWidth = canvasHeight * targetRatio;
       }
 
-      // Center the image
-      drawX = (canvasWidth - img.width) / 2;
-      drawY = (canvasHeight - img.height) / 2;
-      drawW = img.width;
-      drawH = img.height;
+      let sx, sy, sWidth, sHeight;
+      if (currentRatio > targetRatio) {
+        sHeight = img.height;
+        sWidth = img.height * targetRatio;
+        sx = (img.width - sWidth) / 2;
+        sy = 0;
+      } else {
+        sWidth = img.width;
+        sHeight = img.width / targetRatio;
+        sx = 0;
+        sy = (img.height - sHeight) / 2;
+      }
 
       const canvas = document.createElement('canvas');
       canvas.width = canvasWidth;
@@ -69,19 +70,142 @@ export const resizeImageToAspectRatio = (
         reject(new Error('Could not get canvas context'));
         return;
       }
-
-      // Fill background with white (Standard for product processing inputs)
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-
-      // Draw image
-      ctx.drawImage(img, drawX, drawY, drawW, drawH);
-
-      // Return base64 (always as PNG for quality/consistency in processing)
+      ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, canvasWidth, canvasHeight);
       const dataUrl = canvas.toDataURL('image/png');
       resolve(dataUrl.split(',')[1]);
     };
     img.onerror = reject;
     img.src = `data:${mimeType};base64,${imageBase64}`;
   });
+};
+
+/**
+ * Optimized addFilmGrain using a Web Worker to keep Main Thread free for animations.
+ */
+export const addFilmGrain = (
+    imageBase64: string,
+    intensity: number = 0.04
+): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                reject(new Error('Could not get canvas context'));
+                return;
+            }
+            ctx.drawImage(img, 0, 0);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+            // Inline Web Worker to avoid blocking main thread
+            const workerCode = `
+                self.onmessage = function(e) {
+                    const { imageData, intensity } = e.data;
+                    const data = imageData.data;
+                    for (let i = 0; i < data.length; i += 4) {
+                        const noise = (Math.random() - 0.5) * 255 * intensity;
+                        data[i] = Math.min(255, Math.max(0, data[i] + noise));
+                        data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + noise));
+                        data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + noise));
+                    }
+                    self.postMessage({ imageData });
+                };
+            `;
+            const blob = new Blob([workerCode], { type: 'application/javascript' });
+            const worker = new Worker(URL.createObjectURL(blob));
+
+            worker.onmessage = (e) => {
+                ctx.putImageData(e.data.imageData, 0, 0);
+                resolve(canvas.toDataURL('image/png'));
+                worker.terminate();
+                URL.revokeObjectURL(blob.toString());
+            };
+
+            worker.postMessage({ imageData, intensity });
+        };
+        img.onerror = reject;
+        img.src = imageBase64.startsWith('data:') ? imageBase64 : `data:image/png;base64,${imageBase64}`;
+    });
+};
+
+export const historyDB = {
+  async open(): Promise<IDBDatabase> {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open('n-era-db', 1);
+      request.onupgradeneeded = (e) => {
+        const db = (e.target as IDBOpenDBRequest).result;
+        if (!db.objectStoreNames.contains('history')) {
+          db.createObjectStore('history', { keyPath: 'id' });
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  },
+
+  async getAll(): Promise<HistoryItem[]> {
+    try {
+      const db = await this.open();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('history', 'readonly');
+        const store = tx.objectStore('history');
+        const request = store.getAll();
+        request.onsuccess = () => {
+          const items = request.result as HistoryItem[];
+          items.sort((a, b) => b.timestamp - a.timestamp);
+          resolve(items);
+        };
+        request.onerror = () => reject(request.error);
+      });
+    } catch (e) {
+      return [];
+    }
+  },
+
+  async add(item: HistoryItem): Promise<void> {
+    try {
+      const db = await this.open();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('history', 'readwrite');
+        const store = tx.objectStore('history');
+        store.put(item);
+        const getAllReq = store.getAll();
+        getAllReq.onsuccess = () => {
+          const items = getAllReq.result as HistoryItem[];
+          if (items.length > 15) {
+             items.sort((a, b) => b.timestamp - a.timestamp);
+             const toDelete = items.slice(15);
+             toDelete.forEach(i => store.delete(i.id));
+          }
+        };
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch (e) {}
+  },
+
+  async delete(id: string): Promise<void> {
+    try {
+      const db = await this.open();
+      const tx = db.transaction('history', 'readwrite');
+      tx.objectStore('history').delete(id);
+      return new Promise((resolve) => {
+          tx.oncomplete = () => resolve();
+      });
+    } catch (e) {}
+  },
+
+  async clear(): Promise<void> {
+    try {
+      const db = await this.open();
+      const tx = db.transaction('history', 'readwrite');
+      tx.objectStore('history').clear();
+      return new Promise((resolve) => {
+          tx.oncomplete = () => resolve();
+      });
+    } catch (e) {}
+  }
 };

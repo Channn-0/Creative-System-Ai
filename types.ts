@@ -83,7 +83,6 @@ export enum InteriorStyle {
   MID_CENTURY = 'Mid-Century Modern',
   BOHEMIAN = 'Bohemian',
   LUXURY_CLASSIC = 'Luxury Classic',
-  CYBERPUNK = 'Cyberpunk / Gamer',
 }
 
 export enum InteriorMaterial {

@@ -99,7 +99,6 @@ const INTERIOR_STYLE_DETAILS: Record<InteriorStyle, string> = {
   [InteriorStyle.MID_CENTURY]: 'Mid-Century: Retro aesthetic with organic curves, teak wood, and olive greens.',
   [InteriorStyle.BOHEMIAN]: 'Bohemian: Eclectic, layered textures, plants, rugs, and relaxed vibes.',
   [InteriorStyle.LUXURY_CLASSIC]: 'Luxury Classic: Ornate details, moldings, chandeliers, and sophisticated elegance.',
-  [InteriorStyle.CYBERPUNK]: 'Cyberpunk: Neon lights, dark tones, and futuristic tech elements.',
 };
 
 const INTERIOR_MATERIAL_DETAILS: Record<InteriorMaterial, string> = {
@@ -151,9 +150,12 @@ export const generateOptimizedPrompt = async (params: GeneratePromptParams): Pro
     const isMatchLighting = params.lighting === LightingStyle.MATCH_REFERENCE;
     const isMatchPerspective = params.perspective === CameraPerspective.MATCH_REFERENCE;
 
-    const lightingDesc = (params.lighting && LIGHTING_DETAILS[params.lighting]) 
-        ? `${params.lighting} (${LIGHTING_DETAILS[params.lighting]})` 
-        : params.lighting;
+    // Logic change: If MATCH_REFERENCE is selected, strictly analyze input image lighting
+    const lightingDesc = isMatchLighting
+        ? "CRITICAL: ANALYZE the Input Image's lighting direction (shadows), intensity (hard/soft), and color temperature. The generated background MUST match this lighting physics exactly so the product looks naturally integrated, not pasted on."
+        : (params.lighting && LIGHTING_DETAILS[params.lighting]) 
+            ? `${params.lighting} (${LIGHTING_DETAILS[params.lighting]})` 
+            : params.lighting;
 
     const perspectiveDesc = (params.perspective && PERSPECTIVE_DETAILS[params.perspective])
         ? `${params.perspective} (${PERSPECTIVE_DETAILS[params.perspective]})`
@@ -163,7 +165,7 @@ export const generateOptimizedPrompt = async (params: GeneratePromptParams): Pro
     Task: Write a descriptive image generation prompt to restyle a product photo.
     
     Attributes:
-    - Lighting: ${isMatchLighting ? 'ANALYZE AND COPY FROM REFERENCE IMAGE' : lightingDesc}
+    - Lighting: ${lightingDesc}
     - Perspective: ${isMatchPerspective ? 'ANALYZE AND COPY FROM REFERENCE IMAGE' : perspectiveDesc}
     - Color Strategy: ${params.colorTheory}
     
@@ -186,8 +188,9 @@ export const generateOptimizedPrompt = async (params: GeneratePromptParams): Pro
         }
         systemInstruction += `\n\n5. CRITICAL: Use the attached additional images as STYLE REFERENCES (Tactic: ${params.referenceTactic}). Extract their style/vibe into text descriptions.`;
         
+        // If we are matching reference, we prefer the STYLE reference if it exists, otherwise fall back to input analysis above.
         if (isMatchLighting) {
-           systemInstruction += `\n\n6. IMPORTANT: You MUST analyze the lighting in the reference image(s) and describe it exactly in the prompt to match.`;
+           systemInstruction += `\n\n6. IMPORTANT: For lighting, prioritize the Input Product Image's lighting direction to ensure realism, but blend it with the Style Reference's atmosphere.`;
         }
         if (isMatchPerspective) {
            systemInstruction += `\n\n7. IMPORTANT: You MUST analyze the camera angle/perspective in the reference image(s) and describe it exactly in the prompt to match.`;

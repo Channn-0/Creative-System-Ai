@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { X, Info, Maximize2, ImageOff } from 'lucide-react';
 
@@ -112,18 +113,21 @@ export const VisualHelper: React.FC<VisualHelperProps> = ({
         </div>
       </div>
 
-      {/* Image Zoom Overlay */}
+      {/* Image Zoom Overlay (FULL SCREEN LIGHTBOX STYLE) */}
       {zoomedImage && (
-        <div className="fixed inset-0 z-[110] bg-black/95 backdrop-blur-xl flex flex-col items-center justify-center p-4 animate-fadeIn" onClick={() => setZoomedImage(null)}>
-          <div className="relative max-w-5xl w-full max-h-[85vh] flex flex-col items-center">
-             <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl">
-                <img src={zoomedImage.url} alt={zoomedImage.label} className="max-w-full max-h-[60vh] object-contain" onClick={e => e.stopPropagation()} />
-             </div>
-             <h3 className="text-white font-bold mt-6 text-xl">{zoomedImage.label}</h3>
-             <button className="absolute -top-12 right-0 p-2 text-white/50 hover:text-white transition-colors" onClick={() => setZoomedImage(null)}>
-                <X size={32} />
-             </button>
-          </div>
+        <div className="fixed inset-0 z-[110] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 animate-fadeIn" onClick={() => setZoomedImage(null)}>
+            <img 
+                src={zoomedImage.url} 
+                alt={zoomedImage.label} 
+                className="max-w-full max-h-full object-contain shadow-2xl drop-shadow-2xl" 
+                onClick={e => e.stopPropagation()} 
+            />
+            {/* Title Overlay */}
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-black/50 backdrop-blur-md px-4 py-2 rounded-full border border-white/10">
+                <span className="text-white font-medium">{zoomedImage.label}</span>
+            </div>
+            {/* Close Button */}
+            <button className="absolute top-6 right-6 text-white/50 hover:text-white transition-colors"><X size={32} /></button>
         </div>
       )}
     </div>
