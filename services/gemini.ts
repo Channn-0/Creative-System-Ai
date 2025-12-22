@@ -19,10 +19,19 @@ import { resizeImageToAspectRatio } from "../utils";
 const NANO_BANANA_MODEL = 'gemini-2.5-flash-image';
 const PROMPT_MODEL = 'gemini-3-flash-preview';
 
-// Strictly use process.env.API_KEY for initialization as per rules
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+/**
+ * Creates a fresh AI instance. Moving this inside the call ensures 
+ * process.env.API_KEY is accessed at the right moment in production.
+ */
+const getAI = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error("API Key is missing. Please check your environment configuration.");
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
-// --- DETAILED DESCRIPTIONS FOR PROMPTING ---
+// --- DESCRIPTIONS ---
 const LIGHTING_DETAILS: Partial<Record<LightingStyle, string>> = {
   [LightingStyle.STUDIO]: 'Even, controlled lighting. Minimal shadows. Perfect for e-commerce.',
   [LightingStyle.NATURAL]: 'Mimics sunlight. Soft shadows. Good for lifestyle and organic products.',
@@ -79,32 +88,23 @@ const INTERIOR_MATERIAL_DETAILS: Record<InteriorMaterial, string> = {
   [InteriorMaterial.COLORFUL]: 'Vibrant: Bold, vibrant color combinations for a playful and energetic look.',
 };
 
-
 interface GeneratePromptParams {
   mode: AppMode;
   inputImage: ImageFile;
   aspectRatio: AspectRatio;
-  
-  // Studio Params
   lighting?: LightingStyle;
   perspective?: CameraPerspective;
   colorTheory?: ColorTheory;
   styleReferences?: ImageFile[];
   referenceTactic?: ReferenceTactic;
-
-  // Portrait Params
   portraitEnv?: PortraitEnvironment;
   portraitVibe?: PortraitVibe;
-
-  // Interior Params
   interiorStyle?: InteriorStyle;
   interiorMaterial?: InteriorMaterial;
 }
 
 export const generateOptimizedPrompt = async (params: GeneratePromptParams): Promise<string> => {
   const parts: Part[] = [];
-
-  // Add Input Image for analysis
   parts.push({
     inlineData: {
       mimeType: params.inputImage.mimeType,
@@ -119,7 +119,7 @@ export const generateOptimizedPrompt = async (params: GeneratePromptParams): Pro
     const isMatchPerspective = params.perspective === CameraPerspective.MATCH_REFERENCE;
 
     const lightingDesc = isMatchLighting
-        ? "CRITICAL: ANALYZE the Input Image's lighting direction (shadows), intensity (hard/soft), and color temperature. The generated background MUST match this lighting physics exactly so the product looks naturally integrated."
+        ? "ANALYZE carefully the Input Image's lighting direction and shadows. The generated background must match this lighting direction perfectly."
         : (params.lighting && LIGHTING_DETAILS[params.lighting]) 
             ? `${params.lighting} (${LIGHTING_DETAILS[params.lighting]})` 
             : params.lighting;
@@ -128,84 +128,46 @@ export const generateOptimizedPrompt = async (params: GeneratePromptParams): Pro
         ? `${params.perspective} (${PERSPECTIVE_DETAILS[params.perspective]})`
         : params.perspective;
 
-    systemInstruction = `You are an expert commercial art director.
-    Task: Write a descriptive image generation prompt to restyle a product photo.
-    
+    systemInstruction = `You are an expert commercial art director. Write a descriptive image generation prompt to restyle a product photo.
     Attributes:
     - Lighting: ${lightingDesc}
-    - Perspective: ${isMatchPerspective ? 'ANALYZE AND COPY FROM REFERENCE IMAGE' : perspectiveDesc}
+    - Perspective: ${isMatchPerspective ? 'MATCH INPUT IMAGE PERSPECTIVE' : perspectiveDesc}
     - Color Strategy: ${params.colorTheory}
-    
     Instructions:
-    1. ANALYZE the attached Product Image. Identify colors and material.
-    2. Apply the Color Strategy to choose background colors.
-    3. Describe the scene, lighting, and mood using the detailed attributes provided above.
-    4. CRITICAL: Start with "Preserve the exact details, shape, and text of the primary product."
+    1. ANALYZE the attached Product Image.
+    2. Describe the scene, lighting, and mood.
+    3. CRITICAL: Start with "Preserve the exact details, shape, and text of the primary product."
     `;
 
-    // Handle Style References
     if (params.styleReferences && params.styleReferences.length > 0 && params.referenceTactic !== ReferenceTactic.IGNORE) {
         for (const refImg of params.styleReferences) {
-            parts.push({
-                inlineData: {
-                    mimeType: refImg.mimeType,
-                    data: refImg.base64,
-                },
-            });
+            parts.push({ inlineData: { mimeType: refImg.mimeType, data: refImg.base64 } });
         }
-        systemInstruction += `\n\n5. CRITICAL: Use the attached additional images as STYLE REFERENCES (Tactic: ${params.referenceTactic}). Extract their style/vibe into text descriptions.`;
+        systemInstruction += `\n4. Use the attached additional images as STYLE REFERENCES (Tactic: ${params.referenceTactic}).`;
     }
 
   } else if (params.mode === AppMode.PORTRAIT) {
     const envDesc = (params.portraitEnv && PORTRAIT_ENV_DETAILS[params.portraitEnv]) || params.portraitEnv;
     const vibeDesc = (params.portraitVibe && PORTRAIT_VIBE_DETAILS[params.portraitVibe]) || params.portraitVibe;
-
-    systemInstruction = `You are a professional portrait photographer.
-    Task: Write a descriptive prompt to change the background and lighting of a person's photo while preserving their identity.
-    
-    Attributes:
-    - New Environment: ${envDesc}
-    - Vibe/Lighting: ${vibeDesc}
-    
-    Instructions:
-    1. ANALYZE the person in the image.
-    2. Describe a high-quality, realistic scene based on the 'New Environment' details provided.
-    3. Describe the lighting based on 'Vibe' details provided.
-    4. CRITICAL: Start with "Preserve the exact facial features, skin tone, hair, and identity of the person."
-    5. Output ONLY the raw prompt text.
-    `;
+    systemInstruction = `Expert portrait photographer instructions: Describe a scene for '${envDesc}' with '${vibeDesc}' lighting. Start with "Preserve the exact facial features, skin tone, hair, and identity of the person."`;
   } else if (params.mode === AppMode.INTERIOR) {
     const styleDesc = (params.interiorStyle && INTERIOR_STYLE_DETAILS[params.interiorStyle]) || params.interiorStyle;
     const materialDesc = (params.interiorMaterial && INTERIOR_MATERIAL_DETAILS[params.interiorMaterial]) || params.interiorMaterial;
-
-    systemInstruction = `You are an interior designer.
-    Task: Write a descriptive prompt to redecorate a room while keeping its structure.
-    
-    Attributes:
-    - Design Style: ${styleDesc}
-    - Materials: ${materialDesc}
-    
-    Instructions:
-    1. ANALYZE the room's layout, window positions, and perspective.
-    2. Describe the room redecorated in the '${styleDesc}' style.
-    3. Use '${materialDesc}' for furniture and textures.
-    4. CRITICAL: Start with "Preserve the exact structural perspective, walls, floor plan, and window placements of the room."
-    5. Output ONLY the raw prompt text.
-    `;
+    systemInstruction = `Interior designer instructions: Redecorate a room in '${styleDesc}' style using '${materialDesc}'. Start with "Preserve the exact structural perspective, walls, floor plan, and window placements."`;
   }
 
   parts.push({ text: systemInstruction });
 
   try {
+    const ai = getAI();
     const response = await ai.models.generateContent({
       model: PROMPT_MODEL,
       contents: { parts },
     });
-    // Use .text property directly per guidelines
-    return response.text?.trim() || "Preserve the input image exactly.";
-  } catch (error) {
+    return response.text?.trim() || "A high quality professional transformation.";
+  } catch (error: any) {
     console.error("Error generating prompt:", error);
-    throw new Error("Failed to generate prompt: Connection error or invalid API context.");
+    throw new Error(error.message || "Failed to connect to AI service. Check your API key.");
   }
 };
 
@@ -221,40 +183,31 @@ export const generateImage = async (
   );
 
   const parts: Part[] = [
-    {
-      inlineData: {
-        mimeType: 'image/png',
-        data: resizedBase64,
-      },
-    },
-    {
-      text: prompt,
-    },
+    { inlineData: { mimeType: 'image/png', data: resizedBase64 } },
+    { text: prompt },
   ];
 
   try {
+    const ai = getAI();
     const response = await ai.models.generateContent({
       model: NANO_BANANA_MODEL,
       contents: { parts },
       config: {
-        imageConfig: {
-          aspectRatio: aspectRatio,
-        }
+        imageConfig: { aspectRatio: aspectRatio }
       },
     });
 
-    const candidates = response.candidates;
-    if (candidates && candidates.length > 0) {
-      for (const part of candidates[0].content.parts) {
+    const candidate = response.candidates?.[0];
+    if (candidate) {
+      for (const part of candidate.content.parts) {
         if (part.inlineData && part.inlineData.data) {
           return `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
         }
       }
     }
-    
-    throw new Error("No image data found in response.");
-  } catch (error) {
+    throw new Error("Generation complete but no image data returned.");
+  } catch (error: any) {
     console.error("Error generating image:", error);
-    throw new Error("Failed to generate image.");
+    throw new Error(error.message || "Failed to render pixels. Please try again.");
   }
 };

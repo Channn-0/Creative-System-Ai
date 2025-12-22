@@ -110,6 +110,34 @@ const generateAnglePreview = (angle: CameraPerspective): string => {
     return `data:image/svg+xml;base64,${btoa(svg)}`;
 };
 
+const generatePortraitEnvPreview = (env: PortraitEnvironment): string => {
+    const w = 400; const h = 300;
+    const personSvg = `<defs><linearGradient id="personGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#475569" /><stop offset="100%" stop-color="#334155" /></linearGradient></defs><g transform="translate(200, 300)"><path d="M -100 0 C -100 -60, -60 -110, 0 -110 C 60 -110, 100 -60, 100 0 Z" fill="url(#personGrad)" /><rect x="-25" y="-130" width="50" height="40" fill="url(#personGrad)" /><circle cx="0" cy="-160" r="55" fill="url(#personGrad)" /></g>`;
+    let bgContent = '';
+    switch (env) {
+        case PortraitEnvironment.OFFICE: bgContent = `<rect width="${w}" height="${h}" fill="#f1f5f9" /><defs><pattern id="blinds" x="0" y="0" width="10" height="20" patternUnits="userSpaceOnUse"><rect x="0" y="18" width="10" height="2" fill="#cbd5e1" /></pattern></defs><rect width="${w}" height="${h}" fill="url(#blinds)" opacity="0.6" />`; break;
+        case PortraitEnvironment.CAFE: bgContent = `<rect width="${w}" height="${h}" fill="#451a03" /><circle cx="50" cy="50" r="20" fill="#fbbf24" opacity="0.4" filter="blur(5px)" /><circle cx="350" cy="120" r="30" fill="#fbbf24" opacity="0.4" filter="blur(8px)" />`; break;
+        case PortraitEnvironment.NATURE: bgContent = `<rect width="${w}" height="${h}" fill="#ecfdf5" /><path d="M0,300 Q100,100 200,300" fill="#22c55e" opacity="0.2" filter="blur(5px)" />`; break;
+        case PortraitEnvironment.URBAN: bgContent = `<rect width="${w}" height="${h}" fill="#e2e8f0" /><path d="M0,300 L0,150 L60,150 L60,250 L120,250 L120,100 L200,100 L200,200 L300,200 L300,130 L400,130 L400,300 Z" fill="#94a3b8" />`; break;
+        case PortraitEnvironment.STUDIO_GREY: bgContent = `<defs><radialGradient id="studioGrad" cx="0.5" cy="0.5" r="0.7"><stop offset="0%" stop-color="#ffffff" /><stop offset="100%" stop-color="#94a3b8" /></radialGradient></defs><rect width="${w}" height="${h}" fill="url(#studioGrad)" />`; break;
+        case PortraitEnvironment.LUXURY: bgContent = `<rect width="${w}" height="${h}" fill="#1c1917" /><path d="M50,0 V300 M350,0 V300" stroke="#b45309" stroke-width="2" />`; break;
+        case PortraitEnvironment.BEACH: bgContent = `<rect width="${w}" height="${h}" fill="#bae6fd" /><rect x="0" y="180" width="400" height="120" fill="#fde68a" />`; break;
+    }
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">${bgContent}${personSvg}</svg>`;
+    return `data:image/svg+xml;base64,${btoa(svg)}`;
+}
+
+const generateAspectRatioPreview = (ratio: AspectRatio): string => {
+    const w = 400; const h = 300; const cx = w/2; const cy = h/2; const maxW = 220; const maxH = 160;
+    const [rw, rh] = ratio.split(':').map(Number); const r = rw / rh;
+    let boxW, boxH;
+    if (r > (maxW/maxH)) { boxW = maxW; boxH = maxW / r; } else { boxH = maxH; boxW = maxH * r; }
+    const x = cx - boxW/2; const y = cy - boxH/2;
+    const content = `<rect x="0" y="0" width="${w}" height="${h}" fill="#f1f5f9" /><rect x="${x}" y="${y}" width="${boxW}" height="${boxH}" fill="#ffffff" stroke="#334155" stroke-width="4" rx="8" /><text x="${cx}" y="${cy}" fill="#0f172a" font-family="sans-serif" font-size="32" font-weight="800" text-anchor="middle" dominant-baseline="middle">${ratio}</text>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">${content}</svg>`;
+    return `data:image/svg+xml;base64,${btoa(svg)}`;
+}
+
 const getClosestAspectRatio = (width: number, height: number): AspectRatio => {
     const ratio = width / height;
     const supported = [ { r: 1, val: AspectRatio.SQUARE }, { r: 3/4, val: AspectRatio.PORTRAIT }, { r: 4/3, val: AspectRatio.LANDSCAPE }, { r: 16/9, val: AspectRatio.WIDE }, { r: 9/16, val: AspectRatio.TALL } ];
@@ -164,8 +192,8 @@ const App: React.FC = () => {
     return {
         LIGHTING: { title: "Lighting Styles", items: Object.values(LightingStyle).map(style => ({ label: style, desc: style.toString(), imageUrl: generateLightingPreview(style) })) },
         ANGLE: { title: "Camera Angles", items: Object.values(CameraPerspective).map(angle => ({ label: angle, desc: angle.toString(), imageUrl: generateAnglePreview(angle) })) },
-        PORTRAIT_ENV: { title: "Portrait Environment", items: Object.values(PortraitEnvironment).map(env => ({ label: env, desc: env.toString(), imageUrl: "" })) },
-        ASPECT_RATIO: { title: "Aspect Ratio", items: Object.values(AspectRatio).map(r => ({ label: r, desc: r.toString(), imageUrl: "" })) }
+        PORTRAIT_ENV: { title: "Portrait Environment", items: Object.values(PortraitEnvironment).map(env => ({ label: env, desc: env.toString(), imageUrl: generatePortraitEnvPreview(env) })) },
+        ASPECT_RATIO: { title: "Aspect Ratio", items: Object.values(AspectRatio).map(r => ({ label: r, desc: r.toString(), imageUrl: generateAspectRatioPreview(r) })) }
     };
   }, []);
 
@@ -298,7 +326,7 @@ const App: React.FC = () => {
                </div>
             </div>
 
-            {status.error && <div className="p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl flex gap-3 text-red-600 dark:text-red-400 text-sm"><AlertCircle size={18} /> {status.error}</div>}
+            {status.error && <div className="p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl flex gap-3 text-red-600 dark:text-red-400 text-sm transition-all animate-fadeIn"><AlertCircle size={18} /> {status.error}</div>}
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                 <section className="animate-fadeIn md:col-span-2">
