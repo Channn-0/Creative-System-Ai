@@ -23,7 +23,7 @@ import {
 import { generateOptimizedPrompt, generateImage } from './services/gemini';
 import { downloadImage, addFilmGrain, historyDB } from './utils';
 
-// --- SVG PREVIEW GENERATORS (UNCHANGED) ---
+// --- SVG PREVIEW GENERATORS ---
 const generateLightingPreview = (type: LightingStyle): string => {
     const w = 400; const h = 300; const cx = w/2; const cy = h/2; const capW = 50; const capH = 25; const bodyW_bottom = 50; const bodyW_top = 70; const bodyH = 110; const crimpH = 15; const capY = cy + 40; const bodyY_bottom = capY; const bodyY_top = bodyY_bottom - bodyH; const tubePath = `M ${cx - bodyW_bottom/2} ${bodyY_bottom} L ${cx - bodyW_top/2} ${bodyY_top} L ${cx + bodyW_top/2} ${bodyY_top} L ${cx + bodyW_bottom/2} ${bodyY_bottom} Z`; const crimpPath = `M ${cx - bodyW_top/2 - 2} ${bodyY_top} L ${cx - bodyW_top/2 - 2} ${bodyY_top - crimpH} L ${cx + bodyW_top/2 + 2} ${bodyY_top - crimpH} L ${cx + bodyW_top/2 + 2} ${bodyY_top} Z`; const capPath = `M ${cx - capW/2} ${capY} L ${cx - capW/2} ${capY + capH} Q ${cx} ${capY + capH + 5} ${cx + capW/2} ${capY + capH} L ${cx + capW/2} ${capY} Z`; let defs = ''; let content = '';
     switch (type) {
@@ -109,7 +109,7 @@ const App: React.FC = () => {
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [activeHelper, setActiveHelper] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [hasApiKey, setHasApiKey] = useState<boolean>(true); // Assume true initially
+  const [hasApiKey, setHasApiKey] = useState<boolean>(true);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -117,16 +117,19 @@ const App: React.FC = () => {
     else root.classList.remove('dark');
     historyDB.getAll().then(items => { setHistory(items); });
     
-    // Check key status on mount
-    if (window.aistudio) {
+    // Check key status on mount if in aistudio environment
+    if (window.aistudio?.hasSelectedApiKey) {
         window.aistudio.hasSelectedApiKey().then(setHasApiKey);
+    } else {
+        // If not in aistudio, we rely solely on process.env.API_KEY which is handled in gemini.ts
+        setHasApiKey(!!process.env.API_KEY);
     }
   }, [isDarkMode]);
 
   const handleConnectKey = async () => {
-    if (window.aistudio) {
+    if (window.aistudio?.openSelectKey) {
         await window.aistudio.openSelectKey();
-        setHasApiKey(true); // Proceed as instructed
+        setHasApiKey(true);
     }
   };
 
@@ -168,33 +171,84 @@ const App: React.FC = () => {
   };
 
   const handleGenerate = async () => {
-    if (!activeInputImage) { setStatus(prev => ({ ...prev, error: "Please upload an image first." })); return; }
-    
-    // Double check key before generate
-    const keyOk = await window.aistudio.hasSelectedApiKey();
-    if (!keyOk) { setHasApiKey(false); return; }
-
-    let finalAspectRatio = aspectRatio;
-    if (currentMode === AppMode.INTERIOR) {
-        const img = new Image();
-        await new Promise((resolve) => { img.onload = resolve; img.src = `data:${activeInputImage.mimeType};base64,${activeInputImage.base64}`; });
-        finalAspectRatio = getClosestAspectRatio(img.width, img.height);
-        setAspectRatio(finalAspectRatio);
+    if (!activeInputImage) { 
+        setStatus(prev => ({ ...prev, error: "Please upload an image first." })); 
+        return; 
     }
+    
+    // Visual feedback starts immediately
     setStatus({ isGeneratingPrompt: true, isGeneratingImage: true, error: null });
     setGeneratedImageUrl(null);
+
     try {
-      const prompt = await generateOptimizedPrompt({ mode: currentMode, inputImage: activeInputImage, aspectRatio: finalAspectRatio, lighting, perspective, colorTheory, styleReferences: styleImages, referenceTactic: useReference ? referenceTactic : ReferenceTactic.IGNORE, portraitEnv, portraitVibe, interiorStyle, interiorMaterial });
-      setPromptText(prompt);
-      const resultBase64 = await generateImage(activeInputImage, prompt, finalAspectRatio);
-      const grainedBase64 = await addFilmGrain(resultBase64, 0.04);
-      setGeneratedImageUrl(grainedBase64);
-      await historyDB.add({ id: Date.now().toString(), mode: currentMode, timestamp: Date.now(), imageUrl: grainedBase64, prompt, aspectRatio: finalAspectRatio });
-      const freshHistory = await historyDB.getAll(); setHistory(freshHistory);
+        // Double check key if in aistudio environment
+        if (window.aistudio?.hasSelectedApiKey) {
+            const keyOk = await window.aistudio.hasSelectedApiKey();
+            if (!keyOk) { 
+                setHasApiKey(false); 
+                setStatus({ isGeneratingPrompt: false, isGeneratingImage: false, error: null });
+                return; 
+            }
+        }
+
+        let finalAspectRatio = aspectRatio;
+        if (currentMode === AppMode.INTERIOR) {
+            const img = new Image();
+            await new Promise((resolve, reject) => { 
+                img.onload = resolve; 
+                img.onerror = reject;
+                img.src = `data:${activeInputImage.mimeType};base64,${activeInputImage.base64}`; 
+            });
+            finalAspectRatio = getClosestAspectRatio(img.width, img.height);
+            setAspectRatio(finalAspectRatio);
+        }
+
+        const prompt = await generateOptimizedPrompt({ 
+            mode: currentMode, 
+            inputImage: activeInputImage, 
+            aspectRatio: finalAspectRatio, 
+            lighting, 
+            perspective, 
+            colorTheory, 
+            styleReferences: styleImages, 
+            referenceTactic: useReference ? referenceTactic : ReferenceTactic.IGNORE, 
+            portraitEnv, 
+            portraitVibe, 
+            interiorStyle, 
+            interiorMaterial 
+        });
+        
+        setPromptText(prompt);
+        setStatus(prev => ({ ...prev, isGeneratingPrompt: false })); // Prompt done, still rendering image
+
+        const resultBase64 = await generateImage(activeInputImage, prompt, finalAspectRatio);
+        const grainedBase64 = await addFilmGrain(resultBase64, 0.04);
+        
+        setGeneratedImageUrl(grainedBase64);
+        
+        await historyDB.add({ 
+            id: Date.now().toString(), 
+            mode: currentMode, 
+            timestamp: Date.now(), 
+            imageUrl: grainedBase64, 
+            prompt, 
+            aspectRatio: finalAspectRatio 
+        });
+        
+        const freshHistory = await historyDB.getAll(); 
+        setHistory(freshHistory);
+
     } catch (err: any) {
-      if (err.message.includes("API Key")) setHasApiKey(false);
-      setStatus(prev => ({ ...prev, error: err.message || "Generation failed" }));
-    } finally { setStatus(prev => ({ ...prev, isGeneratingPrompt: false, isGeneratingImage: false })); }
+        console.error("Generation Error:", err);
+        if (err.message.includes("API Key")) setHasApiKey(false);
+        setStatus({ 
+            isGeneratingPrompt: false, 
+            isGeneratingImage: false, 
+            error: err.message || "Generation failed. Please try again." 
+        });
+    } finally { 
+        setStatus(prev => ({ ...prev, isGeneratingPrompt: false, isGeneratingImage: false })); 
+    }
   };
 
   const handleRegenerateFromPrompt = async () => {
