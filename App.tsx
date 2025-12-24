@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Sparkles, Wand2, Download, AlertCircle, X, ZoomIn, 
-    Sun, Moon, RefreshCw, Trash2, Key, ExternalLink
+    Sun, Moon, RefreshCw, Trash2
 } from 'lucide-react';
 import { ImageUpload } from './components/ImageUpload';
 import { Select } from './components/Select';
@@ -21,7 +21,7 @@ import {
     ImageFile, GenerationState, HistoryItem 
 } from './types';
 import { generateOptimizedPrompt, generateImage } from './services/gemini';
-import { downloadImage, addFilmGrain, historyDB } from './utils';
+import { downloadImage, addFilmGrain, historyDB, getImageDimensions, getClosestSupportedAspectRatio } from './utils';
 
 // --- SVG PREVIEW GENERATORS ---
 const generateLightingPreview = (type: LightingStyle): string => {
@@ -76,12 +76,6 @@ const generateAspectRatioPreview = (ratio: AspectRatio): string => {
     return `data:image/svg+xml;base64,${btoa(svg)}`;
 }
 
-const getClosestAspectRatio = (width: number, height: number): AspectRatio => {
-    const ratio = width / height;
-    const supported = [ { r: 1, val: AspectRatio.SQUARE }, { r: 3/4, val: AspectRatio.PORTRAIT }, { r: 4/3, val: AspectRatio.LANDSCAPE }, { r: 16/9, val: AspectRatio.WIDE }, { r: 9/16, val: AspectRatio.TALL } ];
-    return supported.reduce((prev, curr) => Math.abs(curr.r - ratio) < Math.abs(prev.r - ratio) ? curr : prev).val;
-};
-
 const App: React.FC = () => {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [currentMode, setCurrentMode] = useState<AppMode>(AppMode.STUDIO);
@@ -109,29 +103,13 @@ const App: React.FC = () => {
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [activeHelper, setActiveHelper] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [hasApiKey, setHasApiKey] = useState<boolean>(true);
 
   useEffect(() => {
     const root = window.document.documentElement;
     if (isDarkMode) root.classList.add('dark');
     else root.classList.remove('dark');
     historyDB.getAll().then(items => { setHistory(items); });
-    
-    // Check key status on mount if in aistudio environment
-    if (window.aistudio?.hasSelectedApiKey) {
-        window.aistudio.hasSelectedApiKey().then(setHasApiKey);
-    } else {
-        // If not in aistudio, we rely solely on process.env.API_KEY which is handled in gemini.ts
-        setHasApiKey(!!process.env.API_KEY);
-    }
   }, [isDarkMode]);
-
-  const handleConnectKey = async () => {
-    if (window.aistudio?.openSelectKey) {
-        await window.aistudio.openSelectKey();
-        setHasApiKey(true);
-    }
-  };
 
   useEffect(() => {
     if (currentMode === AppMode.STUDIO && referenceTactic === ReferenceTactic.FULL && styleImages.length > 0) {
@@ -176,37 +154,26 @@ const App: React.FC = () => {
         return; 
     }
     
-    // Visual feedback starts immediately
     setStatus({ isGeneratingPrompt: true, isGeneratingImage: true, error: null });
     setGeneratedImageUrl(null);
 
     try {
-        // Double check key if in aistudio environment
-        if (window.aistudio?.hasSelectedApiKey) {
-            const keyOk = await window.aistudio.hasSelectedApiKey();
-            if (!keyOk) { 
-                setHasApiKey(false); 
-                setStatus({ isGeneratingPrompt: false, isGeneratingImage: false, error: null });
-                return; 
-            }
-        }
-
-        let finalAspectRatio = aspectRatio;
-        if (currentMode === AppMode.INTERIOR) {
-            const img = new Image();
-            await new Promise((resolve, reject) => { 
-                img.onload = resolve; 
-                img.onerror = reject;
-                img.src = `data:${activeInputImage.mimeType};base64,${activeInputImage.base64}`; 
-            });
-            finalAspectRatio = getClosestAspectRatio(img.width, img.height);
-            setAspectRatio(finalAspectRatio);
+        let finalApiAspectRatio: string = aspectRatio;
+        
+        // Handle Logic for custom calculated or snapped aspect ratios
+        if (aspectRatio === AspectRatio.MATCH_REFERENCE && styleImages.length > 0) {
+            const dims = await getImageDimensions(styleImages[0].base64, styleImages[0].mimeType);
+            // Must snap to closest API-supported string ('1:1', '4:3', etc.)
+            finalApiAspectRatio = getClosestSupportedAspectRatio(dims.width, dims.height);
+        } else if (currentMode === AppMode.INTERIOR) {
+            const dims = await getImageDimensions(activeInputImage.base64, activeInputImage.mimeType);
+            finalApiAspectRatio = getClosestSupportedAspectRatio(dims.width, dims.height);
         }
 
         const prompt = await generateOptimizedPrompt({ 
             mode: currentMode, 
             inputImage: activeInputImage, 
-            aspectRatio: finalAspectRatio, 
+            aspectRatio: finalApiAspectRatio as AspectRatio, 
             lighting, 
             perspective, 
             colorTheory, 
@@ -219,9 +186,9 @@ const App: React.FC = () => {
         });
         
         setPromptText(prompt);
-        setStatus(prev => ({ ...prev, isGeneratingPrompt: false })); // Prompt done, still rendering image
+        setStatus(prev => ({ ...prev, isGeneratingPrompt: false }));
 
-        const resultBase64 = await generateImage(activeInputImage, prompt, finalAspectRatio);
+        const resultBase64 = await generateImage(activeInputImage, prompt, finalApiAspectRatio);
         const grainedBase64 = await addFilmGrain(resultBase64, 0.04);
         
         setGeneratedImageUrl(grainedBase64);
@@ -232,7 +199,7 @@ const App: React.FC = () => {
             timestamp: Date.now(), 
             imageUrl: grainedBase64, 
             prompt, 
-            aspectRatio: finalAspectRatio 
+            aspectRatio: finalApiAspectRatio as AspectRatio
         });
         
         const freshHistory = await historyDB.getAll(); 
@@ -240,7 +207,6 @@ const App: React.FC = () => {
 
     } catch (err: any) {
         console.error("Generation Error:", err);
-        if (err.message.includes("API Key")) setHasApiKey(false);
         setStatus({ 
             isGeneratingPrompt: false, 
             isGeneratingImage: false, 
@@ -266,34 +232,12 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300 font-sans pb-20 lg:pb-0 lg:pl-24">
-      {/* Setup Overlay */}
-      {!hasApiKey && (
-        <div className="fixed inset-0 z-[200] bg-slate-950/80 backdrop-blur-2xl flex items-center justify-center p-6">
-            <div className="max-w-md w-full bg-white dark:bg-slate-900 rounded-3xl p-8 border border-brand-400/30 shadow-2xl animate-fadeIn text-center">
-                <div className="w-20 h-20 bg-brand-400/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <Key className="text-brand-400 w-10 h-10" />
-                </div>
-                <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">Connection Required</h2>
-                <p className="text-slate-500 dark:text-slate-400 mb-8 text-sm leading-relaxed">
-                    N.ERA Pro requires a secure connection to your Gemini API Project. Please connect your project to begin generating high-fidelity assets.
-                </p>
-                <div className="space-y-4">
-                    <Button onClick={handleConnectKey} className="w-full h-14 rounded-2xl" icon={<Sparkles size={18} />}>Connect to Gemini</Button>
-                    <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 text-xs text-slate-400 hover:text-brand-400 transition-colors group">
-                        Requires a paid GCP project <ExternalLink size={12} className="group-hover:translate-x-0.5 transition-transform" />
-                    </a>
-                </div>
-            </div>
-        </div>
-      )}
-
       <Navigation currentMode={currentMode} onModeChange={handleModeChange} onHistoryClick={() => setIsHistoryOpen(true)} hasHistory={history.length > 0} />
       <HistorySidebar isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} history={history} onSelect={(item) => { setGeneratedImageUrl(item.imageUrl); setPromptText(item.prompt); setAspectRatio(item.aspectRatio); setCurrentMode(item.mode); setIsHistoryOpen(false); }} onClear={async () => { await historyDB.clear(); setHistory([]); }} onDelete={async (id) => { await historyDB.delete(id); const fresh = await historyDB.getAll(); setHistory(fresh); }} />
       {activeHelper && helperData[activeHelper as keyof typeof helperData] && <VisualHelper title={helperData[activeHelper as keyof typeof helperData].title} description="Select an option." items={helperData[activeHelper as keyof typeof helperData].items} isOpen={!!activeHelper} onClose={() => setActiveHelper(null)} />}
       
       <div className="flex flex-col lg:flex-row h-[100dvh] overflow-hidden">
         <div className="w-full lg:w-1/2 h-[40dvh] lg:h-full shrink-0 bg-slate-100 dark:bg-slate-900 relative flex items-center justify-center p-4 lg:p-12 overflow-hidden border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 z-10">
-           
            {!status.isGeneratingImage && !status.isGeneratingPrompt && (
               <div className="absolute inset-0 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:20px_20px] opacity-40"></div>
            )}

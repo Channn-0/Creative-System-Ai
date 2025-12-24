@@ -19,6 +19,15 @@ export const fileToImageFile = (file: File): Promise<ImageFile> => {
   });
 };
 
+export const getImageDimensions = (base64: string, mimeType: string): Promise<{width: number, height: number}> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve({ width: img.width, height: img.height });
+    img.onerror = reject;
+    img.src = `data:${mimeType};base64,${base64}`;
+  });
+};
+
 export const downloadImage = (url: string, filename: string) => {
   const link = document.createElement('a');
   link.href = url;
@@ -28,10 +37,34 @@ export const downloadImage = (url: string, filename: string) => {
   document.body.removeChild(link);
 };
 
+/**
+ * Maps any arbitrary width/height ratio to the closest aspect ratio 
+ * supported by the Gemini Image API.
+ */
+export const getClosestSupportedAspectRatio = (width: number, height: number): string => {
+    const ratio = width / height;
+    const supported = [
+        { r: 1, val: '1:1' },
+        { r: 2/3, val: '2:3' },
+        { r: 3/2, val: '3:2' },
+        { r: 3/4, val: '3:4' },
+        { r: 4/3, val: '4:3' },
+        { r: 4/5, val: '4:5' },
+        { r: 5/4, val: '5:4' },
+        { r: 9/16, val: '9:16' },
+        { r: 16/9, val: '16:9' },
+        { r: 21/9, val: '21:9' }
+    ];
+    
+    return supported.reduce((prev, curr) => 
+        Math.abs(curr.r - ratio) < Math.abs(prev.r - ratio) ? curr : prev
+    ).val;
+};
+
 export const resizeImageToAspectRatio = (
   imageBase64: string, 
   mimeType: string, 
-  aspectRatio: AspectRatio
+  aspectRatio: string
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -79,9 +112,6 @@ export const resizeImageToAspectRatio = (
   });
 };
 
-/**
- * Optimized addFilmGrain using a Web Worker to keep Main Thread free for animations.
- */
 export const addFilmGrain = (
     imageBase64: string,
     intensity: number = 0.04
@@ -100,7 +130,6 @@ export const addFilmGrain = (
             ctx.drawImage(img, 0, 0);
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-            // Inline Web Worker to avoid blocking main thread
             const workerCode = `
                 self.onmessage = function(e) {
                     const { imageData, intensity } = e.data;

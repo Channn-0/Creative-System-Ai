@@ -11,11 +11,12 @@ export enum AspectRatio {
   LANDSCAPE = '4:3',
   WIDE = '16:9',
   TALL = '9:16',
+  MATCH_REFERENCE = 'Match Reference',
 }
 
 // --- STUDIO MODE TYPES ---
 export enum LightingStyle {
-  MATCH_REFERENCE = 'Match Reference Image', // NEW
+  MATCH_REFERENCE = 'Match Reference Image',
   STUDIO = 'Studio Lighting',
   NATURAL = 'Natural Sunlight',
   NEON = 'Cyberpunk Neon',
@@ -25,7 +26,7 @@ export enum LightingStyle {
 }
 
 export enum CameraPerspective {
-  MATCH_REFERENCE = 'Match Reference Perspective', // NEW
+  MATCH_REFERENCE = 'Match Reference Perspective',
   FRONT = 'Front View',
   ISOMETRIC = 'Isometric View',
   TOP_DOWN = 'Flat Lay (Top Down)',
