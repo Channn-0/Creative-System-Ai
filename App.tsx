@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Sparkles, Wand2, Download, AlertCircle, X, ZoomIn, 
-    Sun, Moon, RefreshCw, Trash2
+    Sun, Moon, RefreshCw, Trash2, Key, ExternalLink
 } from 'lucide-react';
 import { ImageUpload } from './components/ImageUpload';
 import { Select } from './components/Select';
@@ -78,6 +78,7 @@ const generateAspectRatioPreview = (ratio: AspectRatio): string => {
 
 const App: React.FC = () => {
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isKeySelected, setIsKeySelected] = useState<boolean | null>(null);
   const [currentMode, setCurrentMode] = useState<AppMode>(AppMode.STUDIO);
   const [inputImages, setInputImages] = useState<ImageFile[]>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
@@ -105,6 +106,18 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
   useEffect(() => {
+    // Check for selected API key on mount
+    const checkKey = async () => {
+        if (typeof window.aistudio !== 'undefined') {
+            const hasKey = await window.aistudio.hasSelectedApiKey();
+            setIsKeySelected(hasKey);
+        } else {
+            // Fallback for non-AI Studio environments
+            setIsKeySelected(true);
+        }
+    };
+    checkKey();
+    
     const root = window.document.documentElement;
     if (isDarkMode) root.classList.add('dark');
     else root.classList.remove('dark');
@@ -148,6 +161,13 @@ const App: React.FC = () => {
     setStatus({ isGeneratingImage: false, isGeneratingPrompt: false, error: null });
   };
 
+  const handleOpenSelectKey = async () => {
+    if (window.aistudio) {
+        await window.aistudio.openSelectKey();
+        setIsKeySelected(true); // Proceed assuming selection success
+    }
+  };
+
   const handleGenerate = async () => {
     if (!activeInputImage) { 
         setStatus(prev => ({ ...prev, error: "Please upload an image first." })); 
@@ -160,10 +180,8 @@ const App: React.FC = () => {
     try {
         let finalApiAspectRatio: string = aspectRatio;
         
-        // Handle Logic for custom calculated or snapped aspect ratios
         if (aspectRatio === AspectRatio.MATCH_REFERENCE && styleImages.length > 0) {
             const dims = await getImageDimensions(styleImages[0].base64, styleImages[0].mimeType);
-            // Must snap to closest API-supported string ('1:1', '4:3', etc.)
             finalApiAspectRatio = getClosestSupportedAspectRatio(dims.width, dims.height);
         } else if (currentMode === AppMode.INTERIOR) {
             const dims = await getImageDimensions(activeInputImage.base64, activeInputImage.mimeType);
@@ -207,6 +225,10 @@ const App: React.FC = () => {
 
     } catch (err: any) {
         console.error("Generation Error:", err);
+        // Reset key state if the entity was not found (implies invalid/missing key)
+        if (err.message && err.message.includes("Requested entity was not found")) {
+            setIsKeySelected(false);
+        }
         setStatus({ 
             isGeneratingPrompt: false, 
             isGeneratingImage: false, 
@@ -229,6 +251,40 @@ const App: React.FC = () => {
     } catch (err: any) { setStatus(prev => ({ ...prev, error: err.message || "Generation failed" })); } 
     finally { setStatus(prev => ({ ...prev, isGeneratingPrompt: false, isGeneratingImage: false })); }
   };
+
+  // If we haven't checked for a key yet, or it's false, show activation screen
+  if (isKeySelected === false) {
+    return (
+        <div className="fixed inset-0 z-[200] bg-slate-950 flex items-center justify-center p-6 mesh-gradient overflow-hidden">
+            <div className="max-w-md w-full bg-white dark:bg-slate-900 rounded-[2.5rem] p-10 shadow-2xl text-center border border-white/10 relative z-10 animate-fadeIn">
+                <div className="w-20 h-20 bg-brand-400 rounded-3xl mx-auto flex items-center justify-center mb-8 shadow-xl shadow-brand-400/30 transform -rotate-12 border-2 border-white/20">
+                    <Key className="w-10 h-10 text-slate-900" />
+                </div>
+                <h1 className="text-3xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">Activate N.<span className="text-brand-400">ERA</span></h1>
+                <p className="text-slate-600 dark:text-slate-400 mb-8 leading-relaxed">To access high-fidelity AI imaging, you must connect a paid API key from a Google Cloud Project.</p>
+                
+                <div className="space-y-4">
+                    <Button 
+                        onClick={handleOpenSelectKey} 
+                        className="w-full h-16 text-lg rounded-2xl shadow-xl shadow-brand-400/20"
+                        icon={<Sparkles size={20} />}
+                    >
+                        Select API Key
+                    </Button>
+                    <a 
+                        href="https://ai.google.dev/gemini-api/docs/billing" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-brand-400 transition-colors uppercase tracking-widest"
+                    >
+                        Billing Documentation <ExternalLink size={12} />
+                    </a>
+                </div>
+            </div>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] bg-[radial-gradient(circle_at_center,rgba(250,204,21,0.05)_0%,transparent_70%)] pointer-events-none"></div>
+        </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300 font-sans pb-20 lg:pb-0 lg:pl-24">
