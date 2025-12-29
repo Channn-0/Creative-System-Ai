@@ -50,19 +50,19 @@ const App: React.FC = () => {
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [activeHelper, setActiveHelper] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [isSetupActive, setIsSetupActive] = useState(false);
+  const [isSetupActive, setIsSetupActive] = useState(true);
 
   useEffect(() => {
+    // Initial check for API Key availability in the studio environment
     const checkKey = async () => {
-        // If we are in the AI Studio environment, check if a session key is required
-        if (window.aistudio) {
-            try {
+        try {
+            if (window.aistudio) {
                 const hasKey = await window.aistudio.hasSelectedApiKey();
-                // Only show splash if no key is selected and environment requires it
-                setIsSetupActive(!hasKey);
-            } catch (e) {
-                console.warn("Studio connection check failed, proceeding anyway.");
+                // If a key is already selected, bypass the splash screen
+                if (hasKey) setIsSetupActive(false);
             }
+        } catch (e) {
+            console.debug("Studio connection check deferred.");
         }
     };
     checkKey();
@@ -76,15 +76,16 @@ const App: React.FC = () => {
   const activeInputImage = inputImages.length > 0 && inputImages[selectedImageIndex] ? inputImages[selectedImageIndex] : null;
 
   const handleSetupConnection = async () => {
-    // Attempt to trigger the native picker if available
+    // 1. Attempt to open the secure key picker dialog provided by the platform
     if (window.aistudio) {
         try {
             await window.aistudio.openSelectKey();
         } catch (e) {
-            console.error("Key selection interrupted:", e);
+            console.warn("Secure key selection dialog could not be opened, proceeding to app.");
         }
     }
-    // CRITICAL: Always proceed to the app after triggering the handshake
+    // 2. Regardless of outcome, proceed to the app to allow the user to work
+    // The Gemini SDK will handle error feedback during actual generation if the key is missing.
     setIsSetupActive(false);
   };
 
@@ -166,8 +167,8 @@ const App: React.FC = () => {
         console.error("Generation Error:", err);
         const errorMsg = err.message || "Generation failed.";
         
-        // If API authentication fails, offer to reconnect
-        if (errorMsg.includes("API Key") || errorMsg.includes("Requested entity") || errorMsg.includes("403") || errorMsg.includes("401")) {
+        // Handle specific Auth errors by returning to the setup screen
+        if (errorMsg.includes("API Key") || errorMsg.includes("Requested entity") || errorMsg.includes("403")) {
             setIsSetupActive(true);
         }
         
@@ -191,22 +192,27 @@ const App: React.FC = () => {
                 </div>
                 <h1 className="text-4xl font-black text-white mb-4 tracking-tight">N.<span className="text-brand-400">ERA</span> STUDIO</h1>
                 <p className="text-slate-400 mb-10 leading-relaxed text-sm">
-                    Welcome to the future of product photography. To use the AI image models freely, please activate your studio connection below.
+                    Welcome to the professional photography workspace. Click below to securely connect your Gemini account and begin generating high-fidelity assets.
                 </p>
                 <button 
                     onClick={handleSetupConnection}
-                    className="w-full bg-white text-slate-950 h-16 rounded-2xl font-extrabold text-lg shadow-xl hover:bg-brand-400 transition-all flex items-center justify-center gap-3 active:scale-95"
+                    className="w-full bg-white text-slate-950 h-16 rounded-2xl font-extrabold text-lg shadow-xl hover:bg-brand-400 transition-all flex items-center justify-center gap-3 active:scale-95 group"
                 >
-                    <Zap className="fill-current" />
+                    <Zap className="fill-current group-hover:scale-110 transition-transform" />
                     Enter Studio
                 </button>
-                <div className="mt-8 flex items-center justify-center gap-6 opacity-40">
-                    <div className="flex items-center gap-2 text-white text-[10px] font-bold tracking-widest uppercase">
-                        <ShieldCheck size={14} /> Secure Access
+                <div className="mt-8 flex flex-col items-center gap-4">
+                    <div className="flex items-center gap-6 opacity-40">
+                        <div className="flex items-center gap-2 text-white text-[10px] font-bold tracking-widest uppercase">
+                            <ShieldCheck size={14} /> Secure Link
+                        </div>
+                        <div className="flex items-center gap-2 text-white text-[10px] font-bold tracking-widest uppercase">
+                            <Zap size={14} /> Pro Features
+                        </div>
                     </div>
-                    <div className="flex items-center gap-2 text-white text-[10px] font-bold tracking-widest uppercase">
-                        <Zap size={14} /> High Fidelity
-                    </div>
+                    <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-[10px] text-slate-500 hover:text-slate-300 underline underline-offset-4">
+                        Requires a project with active billing
+                    </a>
                 </div>
             </div>
         </div>
@@ -231,7 +237,7 @@ const App: React.FC = () => {
                  <Sparkles className="w-8 h-8 lg:w-10 lg:h-10 text-brand-400" />
                </div>
                <h1 className="text-lg lg:text-2xl font-bold text-slate-900 dark:text-white mb-1 lg:mb-2">{getModeDisplayName()}</h1>
-               <p className="text-slate-500 dark:text-slate-400 max-w-xs mx-auto text-xs lg:text-sm">{activeInputImage ? "Ready. Configure & Generate." : "Upload an image to start."}</p>
+               <p className="text-slate-500 dark:text-slate-400 max-w-xs mx-auto text-xs lg:text-sm">{activeInputImage ? "Configuration complete. Ready to render." : "Upload an image to start."}</p>
              </div>
            )}
 
@@ -248,6 +254,9 @@ const App: React.FC = () => {
                         </div>
                      </div>
                  </div>
+                 <div className="mt-8 text-white/80 font-bold text-[10px] tracking-[0.2em] uppercase">
+                    {status.isGeneratingPrompt ? "Synthesizing Scene..." : "Rendering Pixels..."}
+                 </div>
              </div>
            )}
 
@@ -257,8 +266,8 @@ const App: React.FC = () => {
                   <img src={generatedImageUrl} alt="AI Result" className="max-w-full max-h-[calc(40dvh-2rem)] lg:max-h-[calc(100vh-6rem)] object-contain" />
                 </div>
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
-                    <button onClick={() => downloadImage(generatedImageUrl, `n-era-${currentMode}.png`)} className="bg-brand-400 text-slate-900 px-4 py-2 rounded-full text-xs font-bold shadow-lg flex items-center gap-2"><Download size={14} /> Save</button>
-                    <button onClick={handleReset} className="bg-white/90 dark:bg-slate-800/90 text-slate-600 dark:text-slate-300 px-4 py-2 rounded-full text-xs font-bold shadow-lg flex items-center gap-2"><Trash2 size={14} /> Clear</button>
+                    <button onClick={() => downloadImage(generatedImageUrl, `n-era-${currentMode}.png`)} className="bg-brand-400 text-slate-900 px-4 py-2 rounded-full text-xs font-bold shadow-lg flex items-center gap-2 hover:bg-brand-500 transition-colors"><Download size={14} /> Save</button>
+                    <button onClick={handleReset} className="bg-white/90 dark:bg-slate-800/90 text-slate-600 dark:text-slate-300 px-4 py-2 rounded-full text-xs font-bold shadow-lg flex items-center gap-2 hover:text-red-500 transition-colors"><Trash2 size={14} /> Clear</button>
                 </div>
              </div>
            )}
@@ -277,19 +286,19 @@ const App: React.FC = () => {
             </div>
 
             {status.error && (
-                <div className="p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4 text-red-600 dark:text-red-400 text-sm transition-all animate-fadeIn">
+                <div className="p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4 text-red-600 dark:text-red-400 text-sm transition-all animate-fadeIn shadow-sm">
                     <div className="flex gap-3">
                         <AlertCircle size={18} className="shrink-0" /> 
                         <span>{status.error}</span>
                     </div>
-                    {(status.error.includes("entity") || status.error.includes("API Key")) && (
+                    {(status.error.includes("entity") || status.error.includes("API Key") || status.error.includes("403")) && (
                         <Button 
                             variant="primary" 
-                            className="!py-1.5 !px-4 !text-xs !rounded-lg" 
+                            className="!py-1.5 !px-4 !text-[10px] !rounded-lg" 
                             onClick={handleSetupConnection}
-                            icon={<RefreshCw size={14} />}
+                            icon={<RefreshCw size={12} />}
                         >
-                            Reconnect
+                            Reconnect Project
                         </Button>
                     )}
                 </div>
@@ -300,13 +309,13 @@ const App: React.FC = () => {
                     <h2 className="text-xs lg:text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-6 flex items-center gap-3"><span className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-500">1</span>Assets</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <ImageUpload label={`${currentMode} Image`} images={inputImages} onImagesChange={setInputImages} selectedIndex={selectedImageIndex} onSelect={setSelectedImageIndex} maxFiles={3} />
-                        {currentMode === AppMode.STUDIO && <div className="pt-0"><ImageUpload label="Reference" images={styleImages} onImagesChange={setStyleImages} optional maxFiles={1} /></div>}
+                        {currentMode === AppMode.STUDIO && <div className="pt-0"><ImageUpload label="Reference Style" images={styleImages} onImagesChange={setStyleImages} optional maxFiles={1} /></div>}
                     </div>
                 </section>
                 <section className="animate-fadeIn delay-75 md:col-span-2">
                     <h2 className="text-xs lg:text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-6 flex items-center gap-3"><span className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-500">2</span>Configuration</h2>
                     <div className="space-y-8">
-                        <div className="max-w-md"><Select label="Format" options={Object.values(AspectRatio).map(v => ({value: v, label: v}))} value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value as AspectRatio)} /></div>
+                        <div className="max-w-md"><Select label="Output Ratio" options={Object.values(AspectRatio).map(v => ({value: v, label: v}))} value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value as AspectRatio)} /></div>
                         {currentMode === AppMode.STUDIO && <StudioPanel lighting={lighting} setLighting={setLighting} perspective={perspective} setPerspective={setPerspective} colorTheory={colorTheory} setColorTheory={setColorTheory} onShowHelper={setActiveHelper} />}
                         {currentMode === AppMode.PORTRAIT && <PortraitPanel env={portraitEnv} setEnv={setPortraitEnv} vibe={portraitVibe} setVibe={setPortraitVibe} onShowHelper={setActiveHelper} />}
                         {currentMode === AppMode.INTERIOR && <InteriorPanel style={interiorStyle} setStyle={setInteriorStyle} material={interiorMaterial} setMaterial={setInteriorMaterial} onShowHelper={setActiveHelper} />}
@@ -317,12 +326,12 @@ const App: React.FC = () => {
             <div className="pt-6 sticky bottom-0 bg-white dark:bg-slate-950 pb-4 border-t border-slate-100 dark:border-slate-800 lg:border-none lg:static space-y-6 z-20">
                <Button 
                   onClick={handleGenerate} 
-                  className="w-full h-14 lg:h-16 text-lg lg:text-xl rounded-2xl shadow-xl shadow-brand-400/20" 
+                  className="w-full h-14 lg:h-16 text-lg lg:text-xl rounded-2xl shadow-xl shadow-brand-400/20 active:scale-[0.98]" 
                   isLoading={status.isGeneratingImage || status.isGeneratingPrompt} 
                   disabled={!activeInputImage} 
                   icon={<Wand2 size={24} />}
                >
-                 {status.isGeneratingPrompt ? 'Analyzing scene...' : status.isGeneratingImage ? 'Rendering pixels...' : 'Generate Transformation'}
+                 {status.isGeneratingPrompt ? 'Analyzing Asset...' : status.isGeneratingImage ? 'Rendering...' : 'Generate New Style'}
                </Button>
             </div>
           </div>
