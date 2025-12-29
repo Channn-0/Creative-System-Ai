@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Sparkles, Wand2, Download, AlertCircle, X, ZoomIn, 
-    Sun, Moon, RefreshCw, Trash2, Key
+    Sun, Moon, RefreshCw, Trash2
 } from 'lucide-react';
 import { ImageUpload } from './components/ImageUpload';
 import { Select } from './components/Select';
@@ -148,17 +148,6 @@ const App: React.FC = () => {
     setStatus({ isGeneratingImage: false, isGeneratingPrompt: false, error: null });
   };
 
-  const handleFixKey = async () => {
-    if (window.aistudio) {
-        await window.aistudio.openSelectKey();
-        setStatus(prev => ({ ...prev, error: null }));
-        // Automatically retry the generation after 1 second if image was set
-        if (activeInputImage) {
-            setTimeout(() => handleGenerate(), 1000);
-        }
-    }
-  };
-
   const handleGenerate = async () => {
     if (!activeInputImage) { 
         setStatus(prev => ({ ...prev, error: "Please upload an image first." })); 
@@ -216,17 +205,10 @@ const App: React.FC = () => {
 
     } catch (err: any) {
         console.error("Generation Error:", err);
-        let errorMsg = err.message || "Generation failed.";
-        
-        // Handle specific browser key error
-        if (errorMsg.includes("API Key must be set")) {
-            errorMsg = "Authentication Required: Your browser needs a Gemini session key.";
-        }
-        
         setStatus({ 
             isGeneratingPrompt: false, 
             isGeneratingImage: false, 
-            error: errorMsg
+            error: err.message || "Generation failed. Please try again later." 
         });
     } finally { 
         setStatus(prev => ({ ...prev, isGeneratingPrompt: false, isGeneratingImage: false })); 
@@ -319,21 +301,9 @@ const App: React.FC = () => {
             </div>
 
             {status.error && (
-                <div className="p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4 text-red-600 dark:text-red-400 text-sm transition-all animate-fadeIn">
-                    <div className="flex gap-3">
-                        <AlertCircle size={18} className="shrink-0" /> 
-                        <span>{status.error}</span>
-                    </div>
-                    {status.error.includes("Authentication Required") && (
-                        <Button 
-                            variant="primary" 
-                            className="!py-1.5 !px-4 !text-xs !rounded-lg whitespace-nowrap shadow-none" 
-                            onClick={handleFixKey}
-                            icon={<Key size={14} />}
-                        >
-                            Link Account Key
-                        </Button>
-                    )}
+                <div className="p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl flex items-center gap-3 text-red-600 dark:text-red-400 text-sm transition-all animate-fadeIn">
+                    <AlertCircle size={18} className="shrink-0" /> 
+                    <span>{status.error}</span>
                 </div>
             )}
             
