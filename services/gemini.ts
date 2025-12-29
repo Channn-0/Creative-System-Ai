@@ -15,7 +15,7 @@ import {
 } from "../types";
 import { resizeImageToAspectRatio } from "../utils";
 
-// Model configuration
+// Model configuration - Explicitly using Gemini 2.5 Flash Image (Nano Banana)
 const IMAGE_MODEL = 'gemini-2.5-flash-image';
 const TEXT_MODEL = 'gemini-3-flash-preview';
 
@@ -84,7 +84,6 @@ export const generateOptimizedPrompt = async (params: GeneratePromptParams): Pro
   parts.push({ text: systemInstruction });
 
   try {
-    // FRESH INSTANCE: Ensure the latest session/API key is used
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: TEXT_MODEL,
@@ -99,7 +98,7 @@ export const generateOptimizedPrompt = async (params: GeneratePromptParams): Pro
 };
 
 /**
- * Renders the final pixel-perfect image using the optimized prompt.
+ * Renders the final pixel-perfect image using the optimized prompt and Nano Banana engine.
  */
 export const generateImage = async (
   inputImage: ImageFile,
@@ -113,7 +112,6 @@ export const generateImage = async (
   ];
 
   try {
-    // FRESH INSTANCE: Required for image models to work with linked sessions
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: IMAGE_MODEL,

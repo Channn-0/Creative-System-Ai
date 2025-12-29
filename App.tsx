@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
     Sparkles, Wand2, Download, AlertCircle, X, 
-    Sun, Moon, RefreshCw, Trash2, Zap
+    Sun, Moon, RefreshCw, Trash2, Zap, ShieldCheck
 } from 'lucide-react';
 import { ImageUpload } from './components/ImageUpload';
 import { Select } from './components/Select';
@@ -50,8 +50,22 @@ const App: React.FC = () => {
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [activeHelper, setActiveHelper] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [isSetupActive, setIsSetupActive] = useState(true);
 
   useEffect(() => {
+    // Check if key is already selected to skip splash if desired, 
+    // but here we keep splash for aesthetic reasons as requested.
+    const checkStatus = async () => {
+        if (window.aistudio) {
+            const hasKey = await window.aistudio.hasSelectedApiKey();
+            if (hasKey) {
+                // We could skip, but user wants the "rich" look of the splash.
+                // For now we stay on splash until "Enter" is clicked.
+            }
+        }
+    };
+    checkStatus();
+
     const root = window.document.documentElement;
     if (isDarkMode) root.classList.add('dark');
     else root.classList.remove('dark');
@@ -59,6 +73,17 @@ const App: React.FC = () => {
   }, [isDarkMode]);
 
   const activeInputImage = inputImages.length > 0 && inputImages[selectedImageIndex] ? inputImages[selectedImageIndex] : null;
+
+  const handleEnterStudio = async () => {
+    if (window.aistudio) {
+        try {
+            await window.aistudio.openSelectKey();
+        } catch (e) {
+            console.warn("Handshake interface skipped or unavailable.");
+        }
+    }
+    setIsSetupActive(false);
+  };
 
   const handleReconnect = async () => {
     if (window.aistudio) {
@@ -156,6 +181,40 @@ const App: React.FC = () => {
         setStatus(prev => ({ ...prev, isGeneratingPrompt: false, isGeneratingImage: false })); 
     }
   };
+
+  if (isSetupActive) {
+      return (
+        <div className="fixed inset-0 z-[200] bg-slate-950 flex flex-col items-center justify-center p-6 text-center overflow-hidden">
+            <div className="absolute inset-0 mesh-gradient opacity-40"></div>
+            <div className="relative z-10 max-w-lg animate-fadeIn">
+                <div className="w-24 h-24 bg-brand-400 rounded-[2.5rem] mx-auto flex items-center justify-center mb-10 shadow-2xl shadow-brand-400/40 transform rotate-12">
+                    <Sparkles className="w-12 h-12 text-slate-950" />
+                </div>
+                <h1 className="text-5xl font-black text-white mb-6 tracking-tight">N.<span className="text-brand-400">ERA</span> STUDIO</h1>
+                <p className="text-slate-400 mb-12 leading-relaxed text-base max-w-sm mx-auto">
+                    Transform your assets with professional-grade AI rendering powered by Gemini Nano Banana.
+                </p>
+                <button 
+                    onClick={handleEnterStudio}
+                    className="w-full bg-white text-slate-950 h-16 rounded-2xl font-black text-xl shadow-xl hover:bg-brand-400 transition-all flex items-center justify-center gap-3 active:scale-95 group"
+                >
+                    <Zap className="fill-current group-hover:scale-110 transition-transform" />
+                    Enter Studio
+                </button>
+                <div className="mt-12 flex flex-col items-center gap-4">
+                    <div className="flex items-center gap-8 opacity-40">
+                        <div className="flex items-center gap-2 text-white text-[10px] font-bold tracking-widest uppercase">
+                            <ShieldCheck size={14} /> Secure Tunnel
+                        </div>
+                        <div className="flex items-center gap-2 text-white text-[10px] font-bold tracking-widest uppercase">
+                            <Zap size={14} /> Flash Engine
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+      );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300 font-sans pb-20 lg:pb-0 lg:pl-24">
