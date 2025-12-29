@@ -53,19 +53,6 @@ const App: React.FC = () => {
   const [isSetupActive, setIsSetupActive] = useState(true);
 
   useEffect(() => {
-    // Check if key is already selected to skip splash if desired, 
-    // but here we keep splash for aesthetic reasons as requested.
-    const checkStatus = async () => {
-        if (window.aistudio) {
-            const hasKey = await window.aistudio.hasSelectedApiKey();
-            if (hasKey) {
-                // We could skip, but user wants the "rich" look of the splash.
-                // For now we stay on splash until "Enter" is clicked.
-            }
-        }
-    };
-    checkStatus();
-
     const root = window.document.documentElement;
     if (isDarkMode) root.classList.add('dark');
     else root.classList.remove('dark');
@@ -75,20 +62,26 @@ const App: React.FC = () => {
   const activeInputImage = inputImages.length > 0 && inputImages[selectedImageIndex] ? inputImages[selectedImageIndex] : null;
 
   const handleEnterStudio = async () => {
+    // Force a key selection check if available to ensure process.env.API_KEY is populated
     if (window.aistudio) {
         try {
-            await window.aistudio.openSelectKey();
+            const alreadyHasKey = await window.aistudio.hasSelectedApiKey();
+            if (!alreadyHasKey) {
+                await window.aistudio.openSelectKey();
+            }
         } catch (e) {
-            console.warn("Handshake interface skipped or unavailable.");
+            console.warn("Handshake interface skipped.");
         }
     }
     setIsSetupActive(false);
+    setStatus(prev => ({ ...prev, error: null }));
   };
 
   const handleReconnect = async () => {
     if (window.aistudio) {
         try {
             await window.aistudio.openSelectKey();
+            setStatus(prev => ({ ...prev, error: null }));
         } catch (e) {
             console.warn("Handshake skipped.");
         }
@@ -171,7 +164,13 @@ const App: React.FC = () => {
 
     } catch (err: any) {
         console.error("Generation Error:", err);
-        const errorMsg = err.message || "Generation failed.";
+        let errorMsg = err.message || "Generation failed.";
+        
+        // Rewrite the internal SDK error to be user-friendly
+        if (errorMsg.includes("API Key") || errorMsg.includes("running in a browser")) {
+            errorMsg = "Studio connection lost. Please click Reconnect to continue.";
+        }
+
         setStatus({ 
             isGeneratingPrompt: false, 
             isGeneratingImage: false, 
@@ -288,7 +287,7 @@ const App: React.FC = () => {
                         <AlertCircle size={18} className="shrink-0" /> 
                         <span>{status.error}</span>
                     </div>
-                    {(status.error.includes("403") || status.error.includes("Key")) && (
+                    {(status.error.toLowerCase().includes("key") || status.error.toLowerCase().includes("connection") || status.error.includes("403")) && (
                         <Button 
                             variant="primary" 
                             className="!py-1.5 !px-4 !text-[10px] !rounded-lg" 
