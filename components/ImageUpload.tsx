@@ -1,5 +1,6 @@
+
 import React, { useRef } from 'react';
-import { Upload, X, Plus } from 'lucide-react';
+import { Upload, X, Plus, Trash2 } from 'lucide-react';
 import { ImageFile } from '../types';
 import { fileToImageFile } from '../utils';
 
@@ -24,7 +25,6 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   
-  // Handle adding new files
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const remainingSlots = maxFiles - images.length;
@@ -38,7 +38,6 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
       } catch (err) {
         console.error("Failed to process images", err);
       }
-      // Reset input so same file can be selected again if deleted
       if (inputRef.current) inputRef.current.value = '';
     }
   };
@@ -65,7 +64,6 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
     }
     
     if (newImages.length > 0) {
-      // Limit to remaining slots
       const limitedNewImages = newImages.slice(0, remainingSlots);
       onImagesChange([...images, ...limitedNewImages]);
       e.preventDefault();
@@ -82,19 +80,19 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
     const newImages = images.filter((_, i) => i !== indexToRemove);
     onImagesChange(newImages);
     
-    // If we removed the selected index, adjust selection
     if (onSelect) {
         if (newImages.length === 0) {
-            onSelect(0); // Reset to 0 (though empty)
+            onSelect(0);
         } else if (indexToRemove === selectedIndex) {
-            // If we removed the active one, select the first one (or previous)
             onSelect(0);
         } else if (indexToRemove < selectedIndex) {
-            // If we removed one before the active one, shift index down
             onSelect(selectedIndex - 1);
         }
     }
   };
+
+  const showHeroPreview = images.length > 0 && (onSelect || maxFiles === 1);
+  const activeImage = images[maxFiles === 1 ? 0 : selectedIndex];
 
   return (
     <div className="w-full">
@@ -114,7 +112,6 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
         onChange={handleFileChange}
       />
 
-      {/* Main Upload Area (Only if empty) */}
       {images.length === 0 ? (
         <div
           onClick={handleTriggerUpload}
@@ -125,83 +122,92 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
             border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-brand-400 dark:hover:border-brand-400
             rounded-2xl bg-slate-50 dark:bg-slate-900/50 hover:bg-white dark:hover:bg-slate-900
             transition-all duration-200 ease-in-out
-            h-36 flex flex-col items-center justify-center text-center p-4
+            h-56 flex flex-col items-center justify-center text-center p-4
             outline-none focus:ring-2 focus:ring-brand-400/50 focus:border-brand-400
           `}
         >
           <div className="bg-white dark:bg-slate-800 p-3 rounded-full mb-3 shadow-sm group-hover:scale-110 transition-transform duration-200">
             <Upload size={20} className="text-brand-400" />
           </div>
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Click or Paste to upload</p>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Supports JPG, PNG, WEBP</p>
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Upload {label}</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Click or Paste image</p>
         </div>
       ) : (
         <div className="space-y-3">
-          {/* Main Preview (Only for selectable types like Product Photo) */}
-          {onSelect && images.length > 0 && images[selectedIndex] && (
-             <div className="relative h-56 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 flex items-center justify-center group shadow-sm">
+          {/* Hero Preview */}
+          {showHeroPreview && activeImage && (
+             <div className="relative h-56 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 flex items-center justify-center group shadow-sm animate-fadeIn">
                  <div className="absolute inset-0 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] opacity-30"></div>
                  <img 
-                    src={images[selectedIndex].previewUrl} 
-                    alt="Active Selection" 
-                    className="max-h-full max-w-full object-contain z-10 p-2"
+                    src={activeImage.previewUrl} 
+                    alt="Active Preview" 
+                    className="max-h-full max-w-full object-contain z-10 p-2 transition-transform duration-500 group-hover:scale-[1.02]"
                  />
                  <div className="absolute top-3 left-3 z-20">
                     <span className="px-2.5 py-1 rounded-md bg-brand-400 text-slate-900 text-[10px] font-bold uppercase tracking-wider shadow-lg">
-                        Active Shot
+                        {maxFiles === 1 ? 'Style Target' : 'Active Shot'}
                     </span>
                  </div>
+                 
+                 {/* Explicit remove button for single files in hero view */}
+                 {maxFiles === 1 && (
+                    <button
+                        onClick={(e) => handleRemove(0, e)}
+                        className="absolute top-3 right-3 p-2 bg-red-500/90 hover:bg-red-600 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-xl hover:scale-110"
+                    >
+                        <Trash2 size={16} />
+                    </button>
+                 )}
              </div>
           )}
 
-          {/* Grid List */}
-          <div 
-            className="grid grid-cols-5 gap-2"
-            onPaste={handlePaste} 
-            tabIndex={0} // Allow paste on the grid area too
-          >
-            {images.map((img, idx) => {
-              const isActive = onSelect && idx === selectedIndex;
-              return (
-                <div 
-                  key={idx}
-                  onClick={() => onSelect && onSelect(idx)}
-                  className={`
-                    relative aspect-square rounded-xl overflow-hidden cursor-pointer
-                    border-2 transition-all group
-                    ${isActive 
-                        ? 'border-brand-400 ring-2 ring-brand-400/20' 
-                        : 'border-slate-200 dark:border-slate-700 hover:border-brand-400/50 dark:hover:border-brand-400/50'}
-                  `}
-                >
-                  <img 
-                    src={img.previewUrl} 
-                    alt={`Thumbnail ${idx}`} 
-                    className="w-full h-full object-cover"
-                  />
-                  
-                  {/* Remove Button */}
-                  <button
-                    onClick={(e) => handleRemove(idx, e)}
-                    className="absolute top-0.5 right-0.5 p-1 bg-red-500/90 hover:bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 scale-90 group-hover:scale-100"
-                  >
-                    <X size={10} />
-                  </button>
-                </div>
-              );
-            })}
+          {/* Thumbnails Grid - Only if multiple files allowed */}
+          {maxFiles > 1 && (
+            <div 
+                className="grid grid-cols-5 gap-2"
+                onPaste={handlePaste} 
+                tabIndex={0}
+            >
+                {images.map((img, idx) => {
+                const isActive = onSelect && idx === selectedIndex;
+                return (
+                    <div 
+                    key={idx}
+                    onClick={() => onSelect && onSelect(idx)}
+                    className={`
+                        relative aspect-square rounded-xl overflow-hidden cursor-pointer
+                        border-2 transition-all group
+                        ${isActive 
+                            ? 'border-brand-400 ring-2 ring-brand-400/20' 
+                            : 'border-slate-200 dark:border-slate-700 hover:border-brand-400/50 dark:hover:border-brand-400/50'}
+                    `}
+                    >
+                    <img 
+                        src={img.previewUrl} 
+                        alt={`Thumbnail ${idx}`} 
+                        className="w-full h-full object-cover"
+                    />
+                    <button
+                        onClick={(e) => handleRemove(idx, e)}
+                        className="absolute top-0.5 right-0.5 p-1 bg-red-500/90 hover:bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 scale-90 group-hover:scale-100"
+                    >
+                        <X size={10} />
+                    </button>
+                    </div>
+                );
+                })}
 
-            {/* Add More Button */}
-            {images.length < maxFiles && (
-              <button
-                onClick={handleTriggerUpload}
-                className="aspect-square rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-brand-400 dark:hover:border-brand-400 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center transition-all text-slate-400 dark:text-slate-500 hover:text-brand-400 dark:hover:text-brand-400"
-                title="Add another image"
-              >
-                <Plus size={20} />
-              </button>
-            )}
-          </div>
+                {images.length < maxFiles && (
+                <button
+                    onClick={handleTriggerUpload}
+                    className="aspect-square rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-brand-400 dark:hover:border-brand-400 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center transition-all text-slate-400 dark:text-slate-500 hover:text-brand-400 dark:hover:text-brand-400"
+                    title="Add another image"
+                >
+                    <Plus size={20} />
+                </button>
+                )}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -40,20 +40,16 @@ export const downloadImage = (url: string, filename: string) => {
 /**
  * Maps any arbitrary width/height ratio to the closest aspect ratio 
  * supported by the Gemini Image API.
+ * Fix: Limited to supported values for Gemini models: "1:1", "3:4", "4:3", "9:16", and "16:9".
  */
 export const getClosestSupportedAspectRatio = (width: number, height: number): string => {
     const ratio = width / height;
     const supported = [
         { r: 1, val: '1:1' },
-        { r: 2/3, val: '2:3' },
-        { r: 3/2, val: '3:2' },
         { r: 3/4, val: '3:4' },
         { r: 4/3, val: '4:3' },
-        { r: 4/5, val: '4:5' },
-        { r: 5/4, val: '5:4' },
         { r: 9/16, val: '9:16' },
-        { r: 16/9, val: '16:9' },
-        { r: 21/9, val: '21:9' }
+        { r: 16/9, val: '16:9' }
     ];
     
     return supported.reduce((prev, curr) => 
