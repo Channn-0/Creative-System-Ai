@@ -23,39 +23,6 @@ import {
 import { generateOptimizedPrompt, generateImage } from './services/gemini';
 import { downloadImage, addFilmGrain, historyDB, getImageDimensions, getClosestSupportedAspectRatio } from './utils';
 
-// --- SVG PREVIEW GENERATORS (Unchanged) ---
-const generateLightingPreview = (type: LightingStyle): string => {
-    const w = 400; const h = 300; const cx = w/2; const cy = h/2; const capW = 50; const capH = 25; const bodyW_bottom = 50; const bodyW_top = 70; const bodyH = 110; const crimpH = 15; const capY = cy + 40; const bodyY_bottom = capY; const bodyY_top = bodyY_bottom - bodyH; const tubePath = `M ${cx - bodyW_bottom/2} ${bodyY_bottom} L ${cx - bodyW_top/2} ${bodyY_top} L ${cx + bodyW_top/2} ${bodyY_top} L ${cx + bodyW_bottom/2} ${bodyY_bottom} Z`; const crimpPath = `M ${cx - bodyW_top/2 - 2} ${bodyY_top} L ${cx - bodyW_top/2 - 2} ${bodyY_top - crimpH} L ${cx + bodyW_top/2 + 2} ${bodyY_top - crimpH} L ${cx + bodyW_top/2 + 2} ${bodyY_top} Z`; const capPath = `M ${cx - capW/2} ${capY} L ${cx - capW/2} ${capY + capH} Q ${cx} ${capY + capH + 5} ${cx + capW/2} ${capY + capH} L ${cx + capW/2} ${capY} Z`; let defs = ''; let content = '';
-    switch (type) {
-        case LightingStyle.STUDIO: defs = `<linearGradient id="studioTube" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#cbd5e1"/><stop offset="40%" stop-color="#ffffff"/><stop offset="60%" stop-color="#ffffff"/><stop offset="100%" stop-color="#94a3b8"/></linearGradient><filter id="softShadow" x="-50%" y="0" width="200%" height="200%"><feGaussianBlur in="SourceAlpha" stdDeviation="5"/><feOffset dy="5" result="offsetblur"/><feComponentTransfer><feFuncA type="linear" slope="0.3"/></feComponentTransfer><feMerge><feMergeNode in="offsetblur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`; content = `<rect x="0" y="0" width="${w}" height="${h}" fill="#e2e8f0" /><path d="${capPath}" fill="#475569" filter="url(#softShadow)" /><path d="${tubePath}" fill="url(#studioTube)" filter="url(#softShadow)" /><path d="${crimpPath}" fill="#e2e8f0" stroke="#cbd5e1" filter="url(#softShadow)" />`; break;
-        case LightingStyle.NATURAL: defs = `<filter id="leaf" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur in="SourceGraphic" stdDeviation="3" /></filter>`; content = `<rect x="0" y="0" width="${w}" height="${h}" fill="#f1f5f9" /><g transform="skewX(-30) translate(120, 0)" opacity="0.2" fill="#000"><path d="${capPath}" /><path d="${tubePath}" /><path d="${crimpPath}" /></g><g><path d="${capPath}" fill="#64748b" /><path d="${tubePath}" fill="#ffffff" /><path d="${crimpPath}" fill="#f1f5f9" /></g><path d="M${cx-150} ${cy-150} C${cx} ${cy-50}, ${cx+50} ${cy+50}, ${cx+200} ${cy+200}" stroke="#000" stroke-width="80" opacity="0.05" filter="url(#leaf)"/>`; break;
-        case LightingStyle.CINEMATIC: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="#0a0a0a" /><defs><linearGradient id="cineLight" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#000"/><stop offset="40%" stop-color="#1e293b"/><stop offset="60%" stop-color="#fff"/><stop offset="100%" stop-color="#334155"/></linearGradient></defs><path d="M${w} 0 L${cx-40} ${h} L${w} ${h} Z" fill="#fff" opacity="0.07" /><g><path d="${capPath}" fill="#0f172a" stroke="#334155" stroke-width="1"/><path d="${tubePath}" fill="url(#cineLight)" /><path d="${crimpPath}" fill="url(#cineLight)" /></g>`; break;
-        case LightingStyle.NEON: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="#0a0a0a" /><defs><filter id="neonGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><g filter="url(#neonGlow)"><path d="${capPath}" stroke="#ec4899" stroke-width="3" fill="#171717" /><path d="${tubePath}" stroke="#3b82f6" stroke-width="3" fill="#171717" /><path d="${crimpPath}" stroke="#ec4899" stroke-width="3" fill="#171717" /></g>`; break;
-        case LightingStyle.MINIMALIST: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="#f8fafc" /><g opacity="0.8"><path d="${capPath}" fill="#cbd5e1" /><path d="${tubePath}" fill="#ffffff" stroke="#e2e8f0" /><path d="${crimpPath}" fill="#f1f5f9" stroke="#e2e8f0" /></g>`; break;
-        case LightingStyle.PRODUCT_BOOST: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="#facc15" /><circle cx="${cx}" cy="${cy}" r="120" fill="#fef08a" opacity="0.5" /><g filter="drop-shadow(0px 10px 10px rgba(0,0,0,0.2))"><path d="${capPath}" fill="#334155" /><path d="${tubePath}" fill="#ffffff" /><path d="${crimpPath}" fill="#ffffff" /></g><rect x="${cx-15}" y="${bodyY_top + 10}" width="10" height="80" fill="white" opacity="0.4" rx="5" />`; break;
-        case LightingStyle.MATCH_REFERENCE: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="#1e293b" /><g stroke="#ffffff" stroke-width="2" fill="none" opacity="0.5"><path d="${capPath}" stroke-dasharray="4 4" /><path d="${tubePath}" stroke-dasharray="4 4" /><path d="${crimpPath}" stroke-dasharray="4 4" /></g><rect x="0" y="${cy}" width="${w}" height="2" fill="#3b82f6" opacity="0.8"><animate attributeName="y" from="0" to="${h}" duration="2s" repeatCount="indefinite" /></rect>`; break;
-    }
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">${defs}${content}</svg>`;
-    return `data:image/svg+xml;base64,${btoa(svg)}`;
-};
-
-const generateAnglePreview = (angle: CameraPerspective): string => {
-    const w = 400; const h = 300; const cx = w/2; const cy = h/2; const bg = "#334155"; const cTube = "#f1f5f9"; const cCap = "#475569"; const cHighlight = "#ffffff"; let content = ''; const drawCamera = (scale = 1, rotate = 0) => `<g transform="translate(${cx}, ${cy}) rotate(${rotate}) scale(${scale}) translate(-${cx}, -${cy})"><rect x="${cx-60}" y="${cy-40}" width="120" height="80" rx="10" fill="none" stroke="white" stroke-width="4"/><circle cx="${cx}" cy="${cy}" r="25" fill="none" stroke="white" stroke-width="4"/><rect x="${cx+20}" y="${cy-55}" width="20" height="15" fill="white"/></g>`;
-    switch (angle) {
-        case CameraPerspective.FRONT: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" /><g transform="translate(${cx}, ${cy})"><rect x="-35" y="-60" width="70" height="15" fill="${cTube}" /><path d="M -25 60 L -35 -45 L 35 -45 L 25 60 Z" fill="${cTube}" /><rect x="-25" y="60" width="50" height="25" fill="${cCap}" /><rect x="-10" y="-40" width="5" height="90" fill="${cHighlight}" opacity="0.3" /><text x="0" y="110" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">FRONT</text></g>`; break;
-        case CameraPerspective.TOP_DOWN: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" /><g transform="rotate(-90 ${cx} ${cy}) translate(0, -10)"><path d="M ${cx-30} ${cy+65} L ${cx-40} ${cy-45} L ${cx+40} ${cy-45} L ${cx+30} ${cy+65} Z" fill="black" opacity="0.3" filter="blur(4px)" transform="translate(5, 5)" /><rect x="${cx - 25}" y="${cy + 60}" width="50" height="25" fill="${cCap}" /><path d="M ${cx - 25} ${cy + 60} L ${cx - 35} ${cy - 50} L ${cx + 35} ${cy - 50} L ${cx + 25} ${cy + 60} Z" fill="${cTube}" /><rect x="${cx - 35}" y="${cy - 65}" width="70" height="15" fill="#e2e8f0" /></g><text x="${cx}" y="${cy+120}" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">FLAT LAY</text>`; break;
-        case CameraPerspective.ISOMETRIC: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" /><g transform="translate(${cx}, ${cy})"><path d="M -25 60 L -25 85 L 25 85 L 25 60 Z" fill="${cCap}" /><path d="M 25 60 L 25 85 L 45 65 L 45 40 Z" fill="#334155" opacity="0.5"/><path d="M -25 60 L -35 -45 L 35 -45 L 25 60 Z" fill="${cTube}" /><path d="M 25 60 L 35 -45 L 55 -65 L 45 40 Z" fill="#cbd5e1" /><path d="M -35 -45 L -35 -60 L 35 -60 L 35 -45 Z" fill="#e2e8f0" /><path d="M 35 -45 L 35 -60 L 55 -80 L 55 -65 Z" fill="#94a3b8" /><text x="0" y="120" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">ISOMETRIC</text></g>`; break;
-        case CameraPerspective.LOW_ANGLE: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" /><g transform="translate(${cx}, ${cy})"><ellipse cx="0" cy="70" rx="35" ry="12" fill="#1e293b" stroke="${cCap}" stroke-width="2"/><path d="M -35 70 L -35 45 L 35 45 L 35 70 Z" fill="${cCap}" /><path d="M -35 45 L -20 -50 L 20 -50 L 35 45 Z" fill="${cTube}" /><rect x="-20" y="-65" width="40" height="15" fill="#e2e8f0" /><path d="M -200 80 L 200 80 M -200 120 L 200 120" stroke="white" stroke-opacity="0.1" /><text x="0" y="120" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">LOW ANGLE</text></g>`; break;
-        case CameraPerspective.HIGH_ANGLE: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" /><g transform="translate(${cx}, ${cy})"><ellipse cx="0" cy="80" rx="15" ry="8" fill="${cCap}" opacity="0.5"/> <path d="M -15 80 L -45 -20 L 45 -20 L 15 80 Z" fill="${cTube}" /><path d="M -45 -20 Q 0 -30 45 -20 L 45 -40 Q 0 -50 -45 -40 Z" fill="#e2e8f0" /><text x="0" y="120" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">HIGH ANGLE</text></g>`; break;
-        case CameraPerspective.CLOSE_UP: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" />${drawCamera(1.8)}<text x="${cx}" y="${cy+130}" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">MACRO CLOSE-UP</text>`; break;
-        case CameraPerspective.WIDE_ANGLE: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" /><line x1="0" y1="0" x2="${cx-60}" y2="${cy-40}" stroke="white" stroke-width="3" /><line x1="${w}" y1="0" x2="${cx+60}" y2="${cy-40}" stroke="white" stroke-width="3" /><line x1="0" y1="${h}" x2="${cx-60}" y2="${cy+40}" stroke="white" stroke-width="3" /><line x1="${w}" y1="${h}" x2="${cx+60}" y2="${cy+40}" stroke="white" stroke-width="3" />${drawCamera(1)}<text x="${cx}" y="${cy+120}" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">WIDE ANGLE</text>`; break;
-        case CameraPerspective.DUTCH: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" />${drawCamera(1, -15)}<text x="${cx}" y="${cy+120}" fill="white" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold">DUTCH ANGLE</text>`; break;
-        default: content = `<rect x="0" y="0" width="${w}" height="${h}" fill="${bg}" />${drawCamera(1)}<text x="${cx}" y="${cy+80}" fill="white" text-anchor="middle" font-family="sans-serif">${angle}</text>`; break;
-    }
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">${content}</svg>`;
-    return `data:image/svg+xml;base64,${btoa(svg)}`;
-};
-
 const App: React.FC = () => {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [currentMode, setCurrentMode] = useState<AppMode>(AppMode.STUDIO);
@@ -87,9 +54,15 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const checkKey = async () => {
+        // If we are in the AI Studio environment, check if a session key is required
         if (window.aistudio) {
-            const hasKey = await window.aistudio.hasSelectedApiKey();
-            setIsSetupActive(!hasKey);
+            try {
+                const hasKey = await window.aistudio.hasSelectedApiKey();
+                // Only show splash if no key is selected and environment requires it
+                setIsSetupActive(!hasKey);
+            } catch (e) {
+                console.warn("Studio connection check failed, proceeding anyway.");
+            }
         }
     };
     checkKey();
@@ -103,9 +76,24 @@ const App: React.FC = () => {
   const activeInputImage = inputImages.length > 0 && inputImages[selectedImageIndex] ? inputImages[selectedImageIndex] : null;
 
   const handleSetupConnection = async () => {
+    // Attempt to trigger the native picker if available
     if (window.aistudio) {
-        await window.aistudio.openSelectKey();
-        setIsSetupActive(false);
+        try {
+            await window.aistudio.openSelectKey();
+        } catch (e) {
+            console.error("Key selection interrupted:", e);
+        }
+    }
+    // CRITICAL: Always proceed to the app after triggering the handshake
+    setIsSetupActive(false);
+  };
+
+  const getModeDisplayName = () => {
+    switch (currentMode) {
+      case AppMode.STUDIO: return "Professional Studio";
+      case AppMode.PORTRAIT: return "Portrait Transformation";
+      case AppMode.INTERIOR: return "Interior Design Studio";
+      default: return "AI Creative Studio";
     }
   };
 
@@ -178,7 +166,8 @@ const App: React.FC = () => {
         console.error("Generation Error:", err);
         const errorMsg = err.message || "Generation failed.";
         
-        if (errorMsg.includes("API Key") || errorMsg.includes("Requested entity")) {
+        // If API authentication fails, offer to reconnect
+        if (errorMsg.includes("API Key") || errorMsg.includes("Requested entity") || errorMsg.includes("403") || errorMsg.includes("401")) {
             setIsSetupActive(true);
         }
         
@@ -192,19 +181,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Fix: Added missing helper function to resolve reference error in the UI
-  const getModeDisplayName = () => {
-    switch (currentMode) {
-      case AppMode.STUDIO: return "Professional Studio";
-      case AppMode.PORTRAIT: return "Portrait Transformation";
-      case AppMode.INTERIOR: return "Interior Design Studio";
-      default: return "AI Creative Transformation";
-    }
-  };
-
-  // --- RENDERING ---
-  
-  // 1. SETUP SPLASH (GUEST ACCESS)
   if (isSetupActive) {
     return (
         <div className="fixed inset-0 z-[200] bg-slate-950 flex flex-col items-center justify-center p-6 text-center overflow-hidden">
@@ -237,7 +213,6 @@ const App: React.FC = () => {
     );
   }
 
-  // 2. MAIN APP
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300 font-sans pb-20 lg:pb-0 lg:pl-24">
       <Navigation currentMode={currentMode} onModeChange={handleModeChange} onHistoryClick={() => setIsHistoryOpen(true)} hasHistory={history.length > 0} />
@@ -245,7 +220,6 @@ const App: React.FC = () => {
       {activeHelper && <VisualHelper title="Visual Guide" description="Select a style." items={[]} isOpen={!!activeHelper} onClose={() => setActiveHelper(null)} />}
       
       <div className="flex flex-col lg:flex-row h-[100dvh] overflow-hidden">
-        {/* Preview Panel */}
         <div className="w-full lg:w-1/2 h-[40dvh] lg:h-full shrink-0 bg-slate-100 dark:bg-slate-900 relative flex items-center justify-center p-4 lg:p-12 overflow-hidden border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 z-10">
            {!status.isGeneratingImage && !status.isGeneratingPrompt && (
               <div className="absolute inset-0 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:20px_20px] opacity-40"></div>
@@ -290,7 +264,6 @@ const App: React.FC = () => {
            )}
         </div>
 
-        {/* Controls Panel */}
         <div className="flex-1 w-full lg:w-1/2 bg-white dark:bg-slate-950 overflow-y-auto custom-scrollbar">
           <div className="max-w-3xl mx-auto p-5 lg:p-12 pb-24 lg:pb-12 space-y-10">
             <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-900 pb-6 sticky top-0 bg-white/95 dark:bg-slate-950/95 backdrop-blur z-30 pt-2 lg:pt-0">
@@ -309,7 +282,7 @@ const App: React.FC = () => {
                         <AlertCircle size={18} className="shrink-0" /> 
                         <span>{status.error}</span>
                     </div>
-                    {status.error.includes("entity") && (
+                    {(status.error.includes("entity") || status.error.includes("API Key")) && (
                         <Button 
                             variant="primary" 
                             className="!py-1.5 !px-4 !text-xs !rounded-lg" 
@@ -359,7 +332,7 @@ const App: React.FC = () => {
       {isLightboxOpen && generatedImageUrl && (
          <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4" onClick={() => setIsLightboxOpen(false)}>
             <img src={generatedImageUrl} className="max-w-full max-h-full object-contain" />
-            <button className="absolute top-6 right-6 text-white/50 hover:text-white"><X size={32} /></button>
+            <button className="absolute top-6 right-6 text-white/50 hover:text-white transition-colors"><X size={32} /></button>
          </div>
       )}
     </div>

@@ -15,17 +15,13 @@ import {
 } from "../types";
 import { resizeImageToAspectRatio } from "../utils";
 
-// Using Gemini 2.5 Flash (Nano Banana) for images and Gemini 3 Flash for logic
+// Model configuration
 const IMAGE_MODEL = 'gemini-2.5-flash-image';
 const TEXT_MODEL = 'gemini-3-flash-preview';
 
 /**
- * Standard AI initialization using the background environment key.
+ * Generates an optimized creative prompt based on user settings.
  */
-const getAI = () => {
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
-};
-
 export const generateOptimizedPrompt = async (params: GeneratePromptParams): Promise<string> => {
   const parts: Part[] = [];
   
@@ -62,18 +58,10 @@ export const generateOptimizedPrompt = async (params: GeneratePromptParams): Pro
             systemInstruction += `
             \n### CRITICAL: TRUE COMPLETE MIMICRY PROTOCOL
             - Perform a forensic visual extraction from the attached Reference Image.
-            - LIGHTING & SHADOW FALL-OFF: Meticulously replicate the directional light quality. Pay special attention to the lighting fall-off. If the reference shows deep, heavy shadows or regions on the periphery (left/right/corners) that fade into "Absolute Black", you MUST describe this chiaroscuro or vignette effect precisely.
-            - CHIAROSCURO: Describe the harsh contrast between illuminated areas and the dark, unlit parts of the frame. Mention specific "black voids" or "absolute black shadows" if present.
-            - TEXTURAL CONGRUENCE: Match the material properties of the surfaces in the reference image (e.g., porous moss, wet stone, frosted glass).
-            - ATMOSPHERE: Reconstruct the global illumination and bounce light hues to ensure the subject looks naturally integrated into the reference's environment.
-            - BOKEH & LENS: Match the depth of field and lens compression of the reference image perfectly.
-            - INTEGRATION: The product must look as if it was physically present during the original photoshoot of the reference image, sharing its exact tonal range and dark intensity.`;
-        } else if (params.referenceTactic === ReferenceTactic.STYLE) {
-            systemInstruction += `\n- STYLE EXTRACTION: Mimic only the aesthetic vibe, color grading, and artistic textures of the reference image.`;
-        } else if (params.referenceTactic === ReferenceTactic.LIGHTING) {
-            systemInstruction += `\n- LIGHTING EXTRACTION: Replicate the exposure levels, high-contrast/low-key attributes, and shadow placement of the reference.`;
-        } else if (params.referenceTactic === ReferenceTactic.COMPOSITION) {
-            systemInstruction += `\n- COMPOSITION EXTRACTION: Replicate the spatial layout and focal arrangement of the reference image.`;
+            - LIGHTING & SHADOW FALL-OFF: Meticulously replicate the directional light quality. Pay special attention to the lighting fall-off.
+            - TEXTURAL CONGRUENCE: Match the material properties of the surfaces in the reference image.
+            - ATMOSPHERE: Reconstruct the global illumination and bounce light hues.
+            - INTEGRATION: The product must look as if it was physically present during the original photoshoot of the reference image.`;
         }
     }
   } else if (params.mode === AppMode.PORTRAIT) {
@@ -82,14 +70,13 @@ export const generateOptimizedPrompt = async (params: GeneratePromptParams): Pro
     - SUBJECT PRESERVATION: Maintain exact facial features, skin texture, and hair identity of the input subject.
     - ENVIRONMENT: ${params.portraitEnv}.
     - LIGHTING & VIBE: ${params.portraitVibe}.
-    - TECHNICAL: Cinematic depth of field, 85mm lens feel, soft eye catchlights, and natural skin pore rendering.`;
+    - TECHNICAL: Cinematic depth of field, 85mm lens feel, soft eye catchlights.`;
   } else if (params.mode === AppMode.INTERIOR) {
     systemInstruction += `
     \n### TASK: INTERIOR ARCHITECTURAL TRANSFORMATION
     - STRUCTURAL INTEGRITY: Preserve the exact room layout, window placements, and perspective lines.
     - DESIGN AESTHETIC: ${params.interiorStyle}.
-    - MATERIALS: Focus on ${params.interiorMaterial}.
-    - LIGHTING: Soft natural ambient light filtering through windows, realistic ray-traced reflections on floor surfaces.`;
+    - MATERIALS: Focus on ${params.interiorMaterial}.`;
   }
 
   systemInstruction += "\n\nOUTPUT ONLY THE FINAL PROMPT STRING. DO NOT INCLUDE ANY PREAMBLE OR EXPLANATION.";
@@ -97,7 +84,8 @@ export const generateOptimizedPrompt = async (params: GeneratePromptParams): Pro
   parts.push({ text: systemInstruction });
 
   try {
-    const ai = getAI();
+    // FRESH INSTANCE: Ensure the latest session/API key is used
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: TEXT_MODEL,
       contents: { parts },
@@ -110,6 +98,9 @@ export const generateOptimizedPrompt = async (params: GeneratePromptParams): Pro
   }
 };
 
+/**
+ * Renders the final pixel-perfect image using the optimized prompt.
+ */
 export const generateImage = async (
   inputImage: ImageFile,
   prompt: string,
@@ -122,7 +113,8 @@ export const generateImage = async (
   ];
 
   try {
-    const ai = getAI();
+    // FRESH INSTANCE: Required for image models to work with linked sessions
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: IMAGE_MODEL,
       contents: { parts },
