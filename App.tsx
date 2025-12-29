@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-    Sparkles, Wand2, Download, AlertCircle, X, ZoomIn, 
-    Sun, Moon, RefreshCw, Trash2, ShieldCheck, Zap
+    Sparkles, Wand2, Download, AlertCircle, X, 
+    Sun, Moon, RefreshCw, Trash2, Zap
 } from 'lucide-react';
 import { ImageUpload } from './components/ImageUpload';
 import { Select } from './components/Select';
@@ -50,23 +50,8 @@ const App: React.FC = () => {
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [activeHelper, setActiveHelper] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [isSetupActive, setIsSetupActive] = useState(true);
 
   useEffect(() => {
-    // Initial check for API Key availability in the studio environment
-    const checkKey = async () => {
-        try {
-            if (window.aistudio) {
-                const hasKey = await window.aistudio.hasSelectedApiKey();
-                // If a key is already selected, bypass the splash screen
-                if (hasKey) setIsSetupActive(false);
-            }
-        } catch (e) {
-            console.debug("Studio connection check deferred.");
-        }
-    };
-    checkKey();
-    
     const root = window.document.documentElement;
     if (isDarkMode) root.classList.add('dark');
     else root.classList.remove('dark');
@@ -75,18 +60,14 @@ const App: React.FC = () => {
 
   const activeInputImage = inputImages.length > 0 && inputImages[selectedImageIndex] ? inputImages[selectedImageIndex] : null;
 
-  const handleSetupConnection = async () => {
-    // 1. Attempt to open the secure key picker dialog provided by the platform
+  const handleReconnect = async () => {
     if (window.aistudio) {
         try {
             await window.aistudio.openSelectKey();
         } catch (e) {
-            console.warn("Secure key selection dialog could not be opened, proceeding to app.");
+            console.warn("Handshake skipped.");
         }
     }
-    // 2. Regardless of outcome, proceed to the app to allow the user to work
-    // The Gemini SDK will handle error feedback during actual generation if the key is missing.
-    setIsSetupActive(false);
   };
 
   const getModeDisplayName = () => {
@@ -166,12 +147,6 @@ const App: React.FC = () => {
     } catch (err: any) {
         console.error("Generation Error:", err);
         const errorMsg = err.message || "Generation failed.";
-        
-        // Handle specific Auth errors by returning to the setup screen
-        if (errorMsg.includes("API Key") || errorMsg.includes("Requested entity") || errorMsg.includes("403")) {
-            setIsSetupActive(true);
-        }
-        
         setStatus({ 
             isGeneratingPrompt: false, 
             isGeneratingImage: false, 
@@ -181,43 +156,6 @@ const App: React.FC = () => {
         setStatus(prev => ({ ...prev, isGeneratingPrompt: false, isGeneratingImage: false })); 
     }
   };
-
-  if (isSetupActive) {
-    return (
-        <div className="fixed inset-0 z-[200] bg-slate-950 flex flex-col items-center justify-center p-6 text-center overflow-hidden">
-            <div className="absolute inset-0 mesh-gradient opacity-40"></div>
-            <div className="relative z-10 max-w-md animate-fadeIn">
-                <div className="w-20 h-20 bg-brand-400 rounded-3xl mx-auto flex items-center justify-center mb-8 shadow-2xl shadow-brand-400/40 transform rotate-12">
-                    <Sparkles className="w-10 h-10 text-slate-950" />
-                </div>
-                <h1 className="text-4xl font-black text-white mb-4 tracking-tight">N.<span className="text-brand-400">ERA</span> STUDIO</h1>
-                <p className="text-slate-400 mb-10 leading-relaxed text-sm">
-                    Welcome to the professional photography workspace. Click below to securely connect your Gemini account and begin generating high-fidelity assets.
-                </p>
-                <button 
-                    onClick={handleSetupConnection}
-                    className="w-full bg-white text-slate-950 h-16 rounded-2xl font-extrabold text-lg shadow-xl hover:bg-brand-400 transition-all flex items-center justify-center gap-3 active:scale-95 group"
-                >
-                    <Zap className="fill-current group-hover:scale-110 transition-transform" />
-                    Enter Studio
-                </button>
-                <div className="mt-8 flex flex-col items-center gap-4">
-                    <div className="flex items-center gap-6 opacity-40">
-                        <div className="flex items-center gap-2 text-white text-[10px] font-bold tracking-widest uppercase">
-                            <ShieldCheck size={14} /> Secure Link
-                        </div>
-                        <div className="flex items-center gap-2 text-white text-[10px] font-bold tracking-widest uppercase">
-                            <Zap size={14} /> Pro Features
-                        </div>
-                    </div>
-                    <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-[10px] text-slate-500 hover:text-slate-300 underline underline-offset-4">
-                        Requires a project with active billing
-                    </a>
-                </div>
-            </div>
-        </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300 font-sans pb-20 lg:pb-0 lg:pl-24">
@@ -237,7 +175,7 @@ const App: React.FC = () => {
                  <Sparkles className="w-8 h-8 lg:w-10 lg:h-10 text-brand-400" />
                </div>
                <h1 className="text-lg lg:text-2xl font-bold text-slate-900 dark:text-white mb-1 lg:mb-2">{getModeDisplayName()}</h1>
-               <p className="text-slate-500 dark:text-slate-400 max-w-xs mx-auto text-xs lg:text-sm">{activeInputImage ? "Configuration complete. Ready to render." : "Upload an image to start."}</p>
+               <p className="text-slate-500 dark:text-slate-400 max-w-xs mx-auto text-xs lg:text-sm">{activeInputImage ? "Ready to render." : "Upload an image to start."}</p>
              </div>
            )}
 
@@ -255,7 +193,7 @@ const App: React.FC = () => {
                      </div>
                  </div>
                  <div className="mt-8 text-white/80 font-bold text-[10px] tracking-[0.2em] uppercase">
-                    {status.isGeneratingPrompt ? "Synthesizing Scene..." : "Rendering Pixels..."}
+                    {status.isGeneratingPrompt ? "Analyzing..." : "Rendering..."}
                  </div>
              </div>
            )}
@@ -291,14 +229,14 @@ const App: React.FC = () => {
                         <AlertCircle size={18} className="shrink-0" /> 
                         <span>{status.error}</span>
                     </div>
-                    {(status.error.includes("entity") || status.error.includes("API Key") || status.error.includes("403")) && (
+                    {(status.error.includes("403") || status.error.includes("Key")) && (
                         <Button 
                             variant="primary" 
                             className="!py-1.5 !px-4 !text-[10px] !rounded-lg" 
-                            onClick={handleSetupConnection}
+                            onClick={handleReconnect}
                             icon={<RefreshCw size={12} />}
                         >
-                            Reconnect Project
+                            Reconnect
                         </Button>
                     )}
                 </div>
@@ -309,13 +247,13 @@ const App: React.FC = () => {
                     <h2 className="text-xs lg:text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-6 flex items-center gap-3"><span className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-500">1</span>Assets</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <ImageUpload label={`${currentMode} Image`} images={inputImages} onImagesChange={setInputImages} selectedIndex={selectedImageIndex} onSelect={setSelectedImageIndex} maxFiles={3} />
-                        {currentMode === AppMode.STUDIO && <div className="pt-0"><ImageUpload label="Reference Style" images={styleImages} onImagesChange={setStyleImages} optional maxFiles={1} /></div>}
+                        {currentMode === AppMode.STUDIO && <div className="pt-0"><ImageUpload label="Style Ref" images={styleImages} onImagesChange={setStyleImages} optional maxFiles={1} /></div>}
                     </div>
                 </section>
                 <section className="animate-fadeIn delay-75 md:col-span-2">
                     <h2 className="text-xs lg:text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-6 flex items-center gap-3"><span className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-500">2</span>Configuration</h2>
                     <div className="space-y-8">
-                        <div className="max-w-md"><Select label="Output Ratio" options={Object.values(AspectRatio).map(v => ({value: v, label: v}))} value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value as AspectRatio)} /></div>
+                        <div className="max-w-md"><Select label="Format" options={Object.values(AspectRatio).map(v => ({value: v, label: v}))} value={aspectRatio} onChange={(e) => setAspectRatio(e.target.value as AspectRatio)} /></div>
                         {currentMode === AppMode.STUDIO && <StudioPanel lighting={lighting} setLighting={setLighting} perspective={perspective} setPerspective={setPerspective} colorTheory={colorTheory} setColorTheory={setColorTheory} onShowHelper={setActiveHelper} />}
                         {currentMode === AppMode.PORTRAIT && <PortraitPanel env={portraitEnv} setEnv={setPortraitEnv} vibe={portraitVibe} setVibe={setPortraitVibe} onShowHelper={setActiveHelper} />}
                         {currentMode === AppMode.INTERIOR && <InteriorPanel style={interiorStyle} setStyle={setInteriorStyle} material={interiorMaterial} setMaterial={setInteriorMaterial} onShowHelper={setActiveHelper} />}
@@ -331,7 +269,7 @@ const App: React.FC = () => {
                   disabled={!activeInputImage} 
                   icon={<Wand2 size={24} />}
                >
-                 {status.isGeneratingPrompt ? 'Analyzing Asset...' : status.isGeneratingImage ? 'Rendering...' : 'Generate New Style'}
+                 {status.isGeneratingPrompt ? 'Analyzing...' : status.isGeneratingImage ? 'Rendering...' : 'Generate Transformation'}
                </Button>
             </div>
           </div>
